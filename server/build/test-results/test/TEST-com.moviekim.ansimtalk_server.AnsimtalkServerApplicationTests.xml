@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests" tests="1" skipped="0" failures="0" errors="0" timestamp="2025-10-25T08:07:30.430Z" hostname="GALAXYBOOK4PRO" time="0.907">
+  <properties/>
+  <testcase name="saveAndFindUserTest()" classname="com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests" time="0.907"/>
+  <system-out><![CDATA[17:07:21.996 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests]: AnsimtalkServerApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+17:07:22.245 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.moviekim.ansimtalk_server.AnsimtalkServerApplication for test class com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2025-10-25T17:07:23.003+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : Starting AnsimtalkServerApplicationTests using Java 21.0.2 with PID 5608 (started by kim32 in C:\Users\kim32\Desktop\AnsimTalk\ansimtalk-server)
+2025-10-25T17:07:23.006+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : No active profile set, falling back to 1 default profile: "default"
+2025-10-25T17:07:24.127+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-10-25T17:07:24.244+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 94 ms. Found 1 JPA repository interface.
+2025-10-25T17:07:25.113+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-10-25T17:07:25.243+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.29.Final
+2025-10-25T17:07:25.299+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-10-25T17:07:25.922+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-10-25T17:07:25.975+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-10-25T17:07:26.657+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@6cde0c69
+2025-10-25T17:07:26.665+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-10-25T17:07:26.767+09:00  WARN 5608 --- [ansimtalk-server] [    Test worker] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-10-25T17:07:26.827+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 8.4.7
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2025-10-25T17:07:28.263+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-10-25T17:07:28.343+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-10-25T17:07:29.498+09:00  WARN 5608 --- [ansimtalk-server] [    Test worker] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-10-25T17:07:30.407+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : Started AnsimtalkServerApplicationTests in 7.892 seconds (process running for 10.052)
+Hibernate: 
+    insert 
+    into
+        users
+        (fcm_token, login_id, name, password, role) 
+    values
+        (?, ?, ?, ?, ?)
+]]></system-out>
+  <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\kim32\.gradle\caches\modules-2\files-2.1\net.bytebuddy\byte-buddy-agent\1.17.7\fbf3d6d649ed37fc9e9c59480a05be0a26e3c2da\byte-buddy-agent-1.17.7.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>
