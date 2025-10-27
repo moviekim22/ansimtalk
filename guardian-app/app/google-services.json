@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "20062045241",
+    "project_id": "ansimtalk-d6d51",
+    "storage_bucket": "ansimtalk-d6d51.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:20062045241:android:b531a0750f1a895a3c79e8",
+        "android_client_info": {
+          "package_name": "com.moviekim.ansimtalk.guardian"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8oAvLhFDL2pI6rm1_yyJhan0hkpxWqwc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
