@@ -40,6 +40,8 @@ android {
 }
 
 dependencies {
+    // Google Play 서비스의 위치 정보 라이브러리
+    implementation("com.google.android.gms:play-services-location:21.2.0")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

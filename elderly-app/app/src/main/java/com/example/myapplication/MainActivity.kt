@@ -1,9 +1,19 @@
 package com.example.myapplication
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,10 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -38,6 +51,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.google.android.gms.location.LocationServices
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -48,8 +62,11 @@ data class Medication(
     val time: String,
     var taken: Boolean = false
 )
+
 // 화면 경로 정의
 object AppDestinations {
+    const val LOGIN = "login"
+    const val SIGN_UP = "signup"
     const val HOME = "home"
     const val SAFETY_CHECK = "safety_check"
     const val MEDICATION = "medication"
@@ -71,12 +88,44 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AnsimTalkApp() {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination?.route
+
+    val showBottomBar = currentDestination !in listOf(AppDestinations.LOGIN, AppDestinations.SIGN_UP)
+
+    // --- 약 목록 상태를 최상위로 이동 ---
+    val medicationList = remember {
+        mutableStateListOf(
+            Medication(name = "철분약", time = "08:00", taken = true),
+            Medication(name = "당뇨약", time = "08:00", taken = true),
+            Medication(name = "소화제", time = "12:00", taken = true),
+            Medication(name = "혈압약", time = "18:00", taken = false),
+            Medication(name = "당뇨약", time = "18:00", taken = false)
+        )
+    }
+
     Scaffold(
-        bottomBar = { AppBottomNavigation(navController = navController) }
+        bottomBar = {
+            if (showBottomBar) {
+                AppBottomNavigation(navController = navController)
+            }
+        }
     ) { innerPadding ->
+        // --- AppNavHost에 약 목록과 모든 수정 함수 전달 ---
         AppNavHost(
             navController = navController,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            medicationList = medicationList,
+            onAddMedication = { name, time -> medicationList.add(Medication(name = name, time = time)) },
+            onTakePill = { medication ->
+                val index = medicationList.indexOf(medication)
+                if (index != -1) {
+                    medicationList[index] = medication.copy(taken = true)
+                }
+            },
+            onRemoveMedication = { medication ->
+                medicationList.remove(medication)
+            }
         )
     }
 }
@@ -84,24 +133,33 @@ fun AnsimTalkApp() {
 @Composable
 fun AppNavHost(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    medicationList: List<Medication>,
+    onAddMedication: (String, String) -> Unit,
+    onTakePill: (Medication) -> Unit,
+    onRemoveMedication: (Medication) -> Unit
 ) {
     NavHost(
         navController = navController,
-        startDestination = AppDestinations.HOME,
+        startDestination = AppDestinations.LOGIN,
         modifier = modifier
     ) {
+        composable(AppDestinations.LOGIN) {
+            LoginScreen(navController)
+        }
+        composable(AppDestinations.SIGN_UP) {
+            SignUpScreen(navController)
+        }
         composable(AppDestinations.HOME) {
-            HomeScreen(navController) // NavController 전달
+            HomeScreen(navController, medicationList)
         }
         composable(AppDestinations.SAFETY_CHECK) {
             SafetyCheckScreen(navController)
         }
         composable(AppDestinations.MEDICATION) {
-            MedicationScreen(navController)
+            MedicationScreen(navController, medicationList, onAddMedication, onTakePill, onRemoveMedication)
         }
         composable(AppDestinations.SETTINGS) {
-            // 설정 화면 (필요 시 구현)
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("설정 화면")
             }
@@ -109,9 +167,134 @@ fun AppNavHost(
     }
 }
 
-
+// --- 로그인 화면 ---
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavController) { // NavController 파라미터 추가
+fun LoginScreen(navController: NavController) {
+    var id by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("안심톡", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(48.dp))
+
+        OutlinedTextField(
+            value = id,
+            onValueChange = { id = it },
+            label = { Text("아이디") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("비밀번호") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = {
+                navController.navigate(AppDestinations.HOME) {
+                    popUpTo(AppDestinations.LOGIN) { inclusive = true }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+        ) {
+            Text("로그인", fontSize = 18.sp)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextButton(
+            onClick = { navController.navigate(AppDestinations.SIGN_UP) }
+        ) {
+            Text("회원가입")
+        }
+    }
+}
+
+// --- 회원가입 화면 ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SignUpScreen(navController: NavController) {
+    var id by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("회원가입") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            OutlinedTextField(
+                value = id,
+                onValueChange = { id = it },
+                label = { Text("아이디") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("이름") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("비밀번호") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = {
+                    navController.popBackStack()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+            ) {
+                Text("회원가입 완료", fontSize = 18.sp)
+            }
+        }
+    }
+}
+
+// --- 홈 화면 ---
+@Composable
+fun HomeScreen(navController: NavController, medicationList: List<Medication>) {
+    val totalPills = medicationList.size
+    val takenPills = medicationList.count { it.taken }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -122,15 +305,266 @@ fun HomeScreen(navController: NavController) { // NavController 파라미터 추
     ) {
         Header()
         EmergencyCallCard()
-        SafetyCheckCard(navController) // NavController 전달
-        MedicationCard(navController) // NavController 전달
+        SafetyCheckCard(navController)
+        MedicationCard(navController, takenCount = takenPills, totalCount = totalPills)
     }
 }
 
+// --- 홈 화면의 카드들 ---
+
+@Composable
+fun Header() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("안녕하세요, 어르신!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Icon(
+            Icons.Default.AccountCircle,
+            contentDescription = "프로필",
+            modifier = Modifier.size(40.dp)
+        )
+    }
+}
+
+@Composable
+fun EmergencyCallCard() {
+    // --- 상태 관리 ---
+    // 다이얼로그를 보여줄지 결정하는 상태
+    var showEmergencyDialog by remember { mutableStateOf(false) }
+    // 현재 컨텍스트를 가져옴
+    val context = LocalContext.current
+
+    // --- 위치 권한 요청을 위한 런처 ---
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissions ->
+            if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
+                permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)) {
+                // 권한이 승인되면 긴급 신고 절차 진행
+                initiateEmergencyCall(context)
+            } else {
+                // 권한이 거부되면 사용자에게 알림
+                Toast.makeText(context, "위치 권한이 없어 위치 전송이 불가능합니다.", Toast.LENGTH_SHORT).show()
+                // 위치 정보 없이 전화만 걸도록 처리
+                try {
+                    val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:119"))
+                    context.startActivity(callIntent)
+                } catch (e: SecurityException) {
+                    Toast.makeText(context, "전화 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    )
+
+    // --- 긴급 신고 확인 다이얼로그 ---
+    if (showEmergencyDialog) {
+        AlertDialog(
+            onDismissRequest = { showEmergencyDialog = false },
+            title = { Text("긴급 신고", color = Color.Red, fontWeight = FontWeight.Bold) },
+            text = { Text("정말로 119에 신고하고 보호자에게 위치를 전송하시겠습니까?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showEmergencyDialog = false
+                        // --- 전화 권한 확인 ---
+                        when (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE)) {
+                            PackageManager.PERMISSION_GRANTED -> {
+                                // 전화 권한이 있으면 위치 권한 확인 시작
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }
+                            else -> {
+                                // 전화 권한이 없는 경우 사용자에게 알림.
+                                // 안드로이드 정책상 전화 권한은 런타임에 직접 요청할 수 없으므로,
+                                // 사용자가 직접 설정에서 켜도록 유도해야 함.
+                                Toast.makeText(context, "전화 권한이 필요합니다. 앱 설정에서 권한을 허용해주세요.", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("신고")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showEmergencyDialog = false }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
+    // --- 기존 카드 UI ---
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("긴급 전화", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("버튼을 누르면 바로 연결돼요")
+            }
+            Button(
+                onClick = {
+                    // 버튼 클릭 시 바로 신고하는 대신 다이얼로그를 띄움
+                    showEmergencyDialog = true
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                shape = CircleShape,
+                modifier = Modifier.size(64.dp)
+            ) {
+                Icon(Icons.Default.Call, contentDescription = "전화 걸기", tint = Color.White)
+            }
+        }
+    }
+}
+
+// --- 실제 긴급 신고 절차를 수행하는 별도의 함수 ---
+private fun initiateEmergencyCall(context: Context) {
+    val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+
+    // 위치 권한이 있는지 다시 한 번 명시적으로 확인 (매우 중요)
+    if (ActivityCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+        return // 권한이 없으면 함수 종료
+    }
+
+    // 마지막으로 알려진 위치를 가져옴
+    fusedLocationClient.lastLocation
+        .addOnSuccessListener { location: Location? ->
+            val locationText = if (location != null) {
+                "위도: ${location.latitude}, 경도: ${location.longitude}"
+            } else {
+                "위치 정보를 가져올 수 없습니다."
+            }
+
+            // [보호자 앱 연동 부분] Logcat에 위치 정보 출력
+            android.util.Log.d("EmergencyCall", "긴급 상황! 보호자에게 위치 전송: $locationText")
+            Toast.makeText(context, "보호자에게 위치를 전송했습니다.", Toast.LENGTH_LONG).show()
+
+            // 119에 전화 걸기
+            try {
+                val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:119"))
+                context.startActivity(callIntent)
+            } catch (e: Exception) {
+                android.util.Log.e("EmergencyCall", "전화 걸기 실패", e)
+                Toast.makeText(context, "전화를 걸 수 없습니다.", Toast.LENGTH_SHORT).show()
+            }
+        }
+        .addOnFailureListener {
+            android.util.Log.e("EmergencyCall", "위치 정보 요청 실패", it)
+            Toast.makeText(context, "위치 정보를 가져오는 데 실패했습니다.", Toast.LENGTH_SHORT).show()
+
+            // 위치 정보 실패 시에도 전화는 걸도록 처리
+            try {
+                val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:119"))
+                context.startActivity(callIntent)
+            } catch (e: SecurityException) {
+                Toast.makeText(context, "전화 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+
+}
+
+@Composable
+fun SafetyCheckCard(navController: NavController) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { navController.navigate(AppDestinations.SAFETY_CHECK) },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("오늘 안부 확인", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("오늘 기분은 어떠세요?")
+            }
+            Icon(Icons.Default.ArrowForwardIos, contentDescription = "이동")
+        }
+    }
+}
+
+@Composable
+fun MedicationCard(navController: NavController, takenCount: Int, totalCount: Int) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { navController.navigate(AppDestinations.MEDICATION) },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("약 관리", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("잊지 말고 약을 챙겨드세요")
+                }
+                Icon(Icons.Default.ArrowForwardIos, contentDescription = "이동")
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            MedicationStatusCard(takenCount = takenCount, totalCount = totalCount)
+        }
+    }
+}
+
+
+// --- 안부 확인 화면 ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SafetyCheckScreen(navController: NavController) {
     var selectedMood by remember { mutableStateOf<String?>(null) }
+    // --- 전송 완료 다이얼로그를 띄울지 결정하는 상태 추가 ---
+    var showConfirmationDialog by remember { mutableStateOf(false) }
+
+    // --- (2) 전송 완료 다이얼로그가 표시되어야 할 때 AlertDialog를 띄움 ---
+    if (showConfirmationDialog) {
+        AlertDialog(
+            onDismissRequest = { /* 다이얼로그 바깥 클릭시 아무것도 안함 */ },
+            title = { Text("전송 완료") },
+            text = { Text("오늘의 안부가 보호자에게 안전하게 전달되었습니다.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConfirmationDialog = false // 다이얼로그 닫기
+                        navController.popBackStack()   // 홈 화면으로 돌아가기
+                    }
+                ) {
+                    Text("확인")
+                }
+            }
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -169,6 +603,7 @@ fun SafetyCheckScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // MoodOption들은 기존과 동일
                     MoodOption(
                         text = "좋아요",
                         icon = Icons.Outlined.SentimentVerySatisfied,
@@ -194,7 +629,17 @@ fun SafetyCheckScreen(navController: NavController) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
-                        onClick = { /* 확인 완료 로직 */ },
+                        // --- (1) 확인 완료 버튼 클릭 시 로직 수정 ---
+                        onClick = {
+                            selectedMood?.let { mood ->
+                                // [나중에 연동할 부분] 보호자 앱으로 데이터 전송하는 로직
+                                // 지금은 Logcat에 출력하여 확인합니다.
+                                android.util.Log.d("SafetyCheck", "보호자에게 전송될 기분: $mood")
+
+                                // 전송이 완료되었으므로, 확인 다이얼로그를 띄우도록 상태 변경
+                                showConfirmationDialog = true
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -234,33 +679,25 @@ fun MoodOption(text: String, icon: ImageVector, color: Color, isSelected: Boolea
 }
 
 
+// --- 약 관리 화면 ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MedicationScreen(navController: NavController) {
-    // 1. 약 목록 상태 관리
-    val medicationList = remember {
-        mutableStateListOf(
-            Medication(name = "철분약", time = "08:00", taken = true),
-            Medication(name = "당뇨약", time = "08:00", taken = true),
-            Medication(name = "소화제", time = "12:00", taken = true),
-            Medication(name = "혈압약", time = "18:00", taken = false),
-            Medication(name = "당뇨약", time = "18:00", taken = false)
-        )
-    }
-
-    // 2. 다이얼로그 표시 여부 상태
+fun MedicationScreen(
+    navController: NavController,
+    medicationList: List<Medication>,
+    onAddMedication: (String, String) -> Unit,
+    onTakePill: (Medication) -> Unit,
+    onRemoveMedication: (Medication) -> Unit
+) {
     var showDialog by remember { mutableStateOf(false) }
-
-    // ★ 추가: 복용 현황 계산
     val totalPills = medicationList.size
     val takenPills = medicationList.count { it.taken }
 
-    // 3. 약 추가 다이얼로그
     if (showDialog) {
         AddMedicationDialog(
             onDismiss = { showDialog = false },
             onAdd = { name, time ->
-                medicationList.add(Medication(name = name, time = time))
+                onAddMedication(name, time)
                 showDialog = false
             }
         )
@@ -273,7 +710,6 @@ fun MedicationScreen(navController: NavController) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 상단 바
         item {
             TopAppBar(
                 title = { Text("약 관리", fontWeight = FontWeight.Bold) },
@@ -283,7 +719,6 @@ fun MedicationScreen(navController: NavController) {
                     }
                 },
                 actions = {
-                    // '추가' 버튼 클릭 시 다이얼로그를 띄움
                     Button(onClick = { showDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "추가")
                         Spacer(modifier = Modifier.width(4.dp))
@@ -294,35 +729,24 @@ fun MedicationScreen(navController: NavController) {
             )
         }
 
-        // 오늘의 복용 현황
         item {
-            // ★ 수정: 계산된 값을 파라미터로 전달
             MedicationStatusCard(takenCount = takenPills, totalCount = totalPills)
         }
 
-        // 복용 일정
         item {
             Text("복용 일정", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // 4. 상태 리스트를 기반으로 아이템 렌더링
                 medicationList.forEach { medication ->
                     MedicationScheduleItem(
                         medication = medication,
-                        onTakePill = {
-                            // '복용' 버튼 클릭 시 taken 상태 변경
-                            val index = medicationList.indexOf(medication)
-                            if (index != -1) {
-                                // 상태를 업데이트하여 리컴포지션 유발
-                                medicationList[index] = medication.copy(taken = true)
-                            }
-                        }
+                        onTakePill = { onTakePill(medication) },
+                        onRemove = { onRemoveMedication(medication) }
                     )
                 }
             }
         }
 
-        // 이번 주 복용 기록
         item {
             Text("이번 주 복용 기록", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 24.dp))
             Spacer(modifier = Modifier.height(8.dp))
@@ -331,12 +755,21 @@ fun MedicationScreen(navController: NavController) {
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(16.dp)
             ) {
+                // --- 동적 날짜 기반의 더미 데이터로 수정 ---
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    WeeklyLogItem(date = "2025-10-10", progress = "3/5")
-                    WeeklyLogItem(date = "2025-10-09", progress = "5/5", completed = true)
-                    WeeklyLogItem(date = "2025-10-08", progress = "5/5", completed = true)
-                    WeeklyLogItem(date = "2025-10-07", progress = "4/5")
-                    WeeklyLogItem(date = "2025-10-06", progress = "5/5", completed = true)
+                    val calendar = Calendar.getInstance()
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    val random = Random()
+
+                    // 오늘부터 과거 5일간의 기록을 동적으로 생성
+                    repeat(5) { dayIndex ->
+                        val date = dateFormat.format(calendar.time)
+                        val total = 5
+                        // 날짜가 오래될수록 약을 다 먹었을 확률을 높임 (더미 데이터의 현실성 부여)
+                        val taken = if (dayIndex < 2) random.nextInt(4) + 1 else total
+                        WeeklyLogItem(date = date, progress = "$taken/$total", completed = (taken == total))
+                        calendar.add(Calendar.DAY_OF_YEAR, -1) // 하루씩 과거로 이동
+                    }
                 }
             }
         }
@@ -344,7 +777,6 @@ fun MedicationScreen(navController: NavController) {
 }
 
 
-// 약 추가 다이얼로그
 @Composable
 fun AddMedicationDialog(onDismiss: () -> Unit, onAdd: (String, String) -> Unit) {
     var medName by remember { mutableStateOf("") }
@@ -379,19 +811,21 @@ fun AddMedicationDialog(onDismiss: () -> Unit, onAdd: (String, String) -> Unit) 
             }
         },
         dismissButton = {
-            Button(onClick = onDismiss) {
+            TextButton(onClick = onDismiss) {
                 Text("취소")
             }
         }
     )
 }
 
+// --- 재사용 가능한 컴포저블 ---
+
 @Composable
-fun MedicationStatusCard(takenCount: Int, totalCount: Int) { // ★ 파라미터 추가
+fun MedicationStatusCard(takenCount: Int, totalCount: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF3E5F5))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF3E5F5)) // 연보라 배경
     ) {
         Row(
             modifier = Modifier
@@ -407,9 +841,7 @@ fun MedicationStatusCard(takenCount: Int, totalCount: Int) { // ★ 파라미터
                     Text("오늘의 복용 현황", fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                // ★ 수정: 파라미터를 사용하여 동적으로 텍스트 표시
                 Text("$takenCount/$totalCount", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                // ★ 추가: 모든 약을 복용했는지에 따라 다른 텍스트 표시
                 if (totalCount > 0 && takenCount == totalCount) {
                     Text("모두 복용 완료!", color = MaterialTheme.colorScheme.primary)
                 } else {
@@ -426,7 +858,6 @@ fun MedicationStatusCard(takenCount: Int, totalCount: Int) { // ★ 파라미터
                 Icon(
                     Icons.Default.Check,
                     contentDescription = "완료",
-                    // ★ 추가: 모든 약을 복용했을 때만 아이콘을 진하게 표시
                     tint = if (totalCount > 0 && takenCount == totalCount) Color(0xFF4CAF50) else Color.LightGray,
                     modifier = Modifier.size(36.dp)
                 )
@@ -435,10 +866,12 @@ fun MedicationStatusCard(takenCount: Int, totalCount: Int) { // ★ 파라미터
     }
 }
 
-
-// MedicationScheduleItem 함수 수정
 @Composable
-fun MedicationScheduleItem(medication: Medication, onTakePill: () -> Unit) {
+fun MedicationScheduleItem(
+    medication: Medication,
+    onTakePill: () -> Unit,
+    onRemove: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -451,9 +884,9 @@ fun MedicationScheduleItem(medication: Medication, onTakePill: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                 Icon(
-                    Icons.Outlined.Info,
+                    Icons.Default.Medication,
                     contentDescription = "약",
                     modifier = Modifier
                         .clip(CircleShape)
@@ -472,26 +905,27 @@ fun MedicationScheduleItem(medication: Medication, onTakePill: () -> Unit) {
                 }
             }
 
-            // '복용 완료' 상태일 때와 아닐 때를 구분하여 표시
-            if (medication.taken) {
-                Text(
-                    text = "복용 완료",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .background(Color(0xFF4CAF50), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                )
-            } else {
-                Button(
-                    onClick = onTakePill,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Black,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("복용")
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // --- 복용/완료 버튼과 삭제 버튼을 담을 Row ---
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (medication.taken) {
+                    Text(
+                        text = "복용 완료",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .background(Color(0xFF4CAF50), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                } else {
+                    Button(onClick = onTakePill, shape = RoundedCornerShape(8.dp)) {
+                        Text("복용")
+                    }
+                }
+                // --- 삭제 버튼 아이콘 추가 ---
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Delete, contentDescription = "삭제", tint = Color.Gray)
                 }
             }
         }
@@ -505,244 +939,69 @@ fun WeeklyLogItem(date: String, progress: String, completed: Boolean = false) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(date, color = Color.Gray, fontSize = 16.sp)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(progress, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            if (completed) {
-                Text(
-                    "완료",
-                    color = Color.White,
-                    modifier = Modifier
-                        .background(Color(0xFF4CAF50), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                )
-            }
-        }
-    }
-}
-
-// --- 홈화면 전용 컴포넌트들 ---
-@Composable
-fun Header() {
-    val dateFormat = SimpleDateFormat("yyyy년 MM월 dd일 EEEE", Locale.KOREAN)
-    val currentDate = dateFormat.format(Date())
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Start
-    ) {
-        Text("안심톡", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-        Text(currentDate, fontSize = 16.sp, color = Color.Gray)
-    }
-}
-
-@Composable
-fun EmergencyCallCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { /* 긴급 호출 로직 */ }, // 클릭 가능하게 변경
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE53935)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = "긴급 호출 아이콘",
-                tint = Color.White,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                "긴급 호출",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-fun SafetyCheckCard(navController: NavController) { // NavController 파라미터 추가
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { navController.navigate(AppDestinations.SAFETY_CHECK) }, // 클릭 시 화면 이동
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = "안부 확인 아이콘",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("오늘의 안부 확인", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("마지막 확인: 오전 9:30", fontSize = 14.sp, color = Color.Gray)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "확인 완료",
-                        color = Color(0xFF4CAF50),
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    )
-                }
-                Button(
-                    onClick = { navController.navigate(AppDestinations.SAFETY_CHECK) }, // 버튼 클릭 시 화면 이동
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0E0E0)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("지금 확인하기", color = Color.Black)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun MedicationCard(navController: NavController) { // NavController 파라미터 추가
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { navController.navigate(AppDestinations.MEDICATION) }, // 클릭 시 화면 이동
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Outlined.Info,
-                    contentDescription = "약 복용 아이콘",
-                    tint = Color(0xFF9575CD),
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("오늘의 약 복용", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            MedicationItem("아침 약", "오전 8:00", true)
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
-            MedicationItem("점심 약", "오후 12:00", true)
-        }
-    }
-}
-
-@Composable
-fun MedicationItem(medName: String, time: String, taken: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
         Column {
-            Text(medName, fontSize = 16.sp)
-            Text(time, fontSize = 14.sp, color = Color.Gray)
+            Text(date, fontWeight = FontWeight.Medium)
+            Text(progress, color = Color.Gray)
         }
-        if (taken) {
-            Text(
-                text = "복용 완료",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .background(Color(0xFF4CAF50), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            )
+        if (completed) {
+            Icon(Icons.Default.CheckCircle, contentDescription = "완료", tint = Color(0xFF4CAF50))
+        } else {
+            Icon(Icons.Default.Error, contentDescription = "미완료", tint = Color.Red.copy(alpha = 0.7f))
         }
     }
 }
 
+
+// --- 하단 네비게이션 바 ---
 @Composable
 fun AppBottomNavigation(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val items = listOf(
-        BottomNavItem("홈", Icons.Filled.Home, AppDestinations.HOME),
-        BottomNavItem("안부확인", Icons.Filled.Check, AppDestinations.SAFETY_CHECK),
-        BottomNavItem("약", Icons.Outlined.Info, AppDestinations.MEDICATION),
-        BottomNavItem("설정", Icons.Filled.Settings, AppDestinations.SETTINGS)
-    )
-
-    NavigationBar(
-        containerColor = Color.White,
-    ) {
-        items.forEach { item ->
-            val isSelected = currentRoute == item.route
-            NavigationBarItem(
-                icon = { Icon(item.icon, contentDescription = item.title) },
-                label = { Text(item.title) },
-                selected = isSelected,
-                onClick = {
-                    if (currentRoute != item.route) {
-                        navController.navigate(item.route) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                    unselectedIconColor = Color.Gray,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    unselectedTextColor = Color.Gray,
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
-        }
-    }
-}
-
-// route 프로퍼티 추가
-data class BottomNavItem(val title: String, val icon: ImageVector, val route: String)
-
-// --- Preview 모음 ---
-
-@Preview(showBackground = true, name = "Home Screen Preview")
-@Composable
-fun HomePreview() {
-    MyApplicationTheme {
-        HomeScreen(rememberNavController())
-    }
-}
-
-@Preview(showBackground = true, name = "Safety Check Screen Preview")
-@Composable
-fun SafetyCheckPreview() {
-    MyApplicationTheme {
-        SafetyCheckScreen(rememberNavController())
-    }
-}
-
-@Preview(showBackground = true, name = "Medication Screen Preview")
-@Composable
-fun MedicationPreview() {
-    MyApplicationTheme {
-        MedicationScreen(rememberNavController())
+    NavigationBar {
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Home, contentDescription = "홈") },
+            label = { Text("홈") },
+            selected = currentRoute == AppDestinations.HOME,
+            onClick = {
+                navController.navigate(AppDestinations.HOME) {
+                    launchSingleTop = true
+                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                }
+            }
+        )
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.CheckCircle, contentDescription = "안부 확인") },
+            label = { Text("안부 확인") },
+            selected = currentRoute == AppDestinations.SAFETY_CHECK,
+            onClick = {
+                navController.navigate(AppDestinations.SAFETY_CHECK) {
+                    launchSingleTop = true
+                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                }
+            }
+        )
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Info, contentDescription = "약 관리") },
+            label = { Text("약 관리") },
+            selected = currentRoute == AppDestinations.MEDICATION,
+            onClick = {
+                navController.navigate(AppDestinations.MEDICATION) {
+                    launchSingleTop = true
+                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                }
+            }
+        )
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Settings, contentDescription = "설정") },
+            label = { Text("설정") },
+            selected = currentRoute == AppDestinations.SETTINGS,
+            onClick = {
+                navController.navigate(AppDestinations.SETTINGS) {
+                    launchSingleTop = true
+                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                }
+            }
+        )
     }
 }
