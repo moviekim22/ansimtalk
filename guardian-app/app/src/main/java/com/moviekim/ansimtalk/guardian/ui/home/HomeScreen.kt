@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moviekim.ansimtalk.guardian.ui.theme.GuardianappTheme
 
-// UI에서 사용할 색상들을 미리 정의합니다.
 val StatusGreen = Color(0xFF4CAF50)
 val StatusRed = Color(0xFFD32F2F)
 val StatusGray = Color(0xFFBDBDBD)

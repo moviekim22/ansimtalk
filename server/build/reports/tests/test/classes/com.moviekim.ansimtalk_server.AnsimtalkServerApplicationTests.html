@@ -29,7 +29,7 @@
 </td>
 <td>
 <div class="infoBox" id="failures">
-<div class="counter">0</div>
+<div class="counter">1</div>
 <p>failures</p>
 </div>
 </td>
@@ -41,7 +41,7 @@
 </td>
 <td>
 <div class="infoBox" id="duration">
-<div class="counter">0.907s</div>
+<div class="counter">0.104s</div>
 <p>duration</p>
 </div>
 </td>
@@ -50,8 +50,8 @@
 </div>
 </td>
 <td>
-<div class="infoBox success" id="successRate">
-<div class="percent">100%</div>
+<div class="infoBox failures" id="successRate">
+<div class="percent">0%</div>
 <p>successful</p>
 </div>
 </td>
@@ -60,6 +60,9 @@
 </div>
 <div class="tab-container">
 <ul class="tabLinks">
+<li>
+<a href="#">Failed tests</a>
+</li>
 <li>
 <a href="#">Tests</a>
 </li>
@@ -71,27 +74,52 @@
 </li>
 </ul>
 <div class="tab">
+<h2>Failed tests</h2>
+<div class="test">
+<a name="fcmSendTest()"></a>
+<h3 class="failures">FCM 알림 전송 요청 실행 테스트</h3>
+<span class="code">
+<pre>Wanted but not invoked:
+firebaseMessaging.send(
+    &lt;any com.google.firebase.messaging.Message&gt;
+);
+-&gt; at com.google.firebase.messaging.FirebaseMessaging.send(FirebaseMessaging.java:90)
+Actually, there were zero interactions with this mock.
+
+	at app//com.google.firebase.messaging.FirebaseMessaging.send(FirebaseMessaging.java:90)
+	at app//com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests.fcmSendTest(AnsimtalkServerApplicationTests.java:53)
+	at java.base@21.0.2/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base@21.0.2/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base@21.0.2/java.util.ArrayList.forEach(ArrayList.java:1596)
+</pre>
+</span>
+</div>
+</div>
+<div class="tab">
 <h2>Tests</h2>
 <table>
 <thead>
 <tr>
 <th>Test</th>
+<th>Method name</th>
 <th>Duration</th>
 <th>Result</th>
 </tr>
 </thead>
 <tr>
-<td class="success">saveAndFindUserTest()</td>
-<td class="success">0.907s</td>
-<td class="success">passed</td>
+<td class="failures">FCM 알림 전송 요청 실행 테스트</td>
+<td class="failures">fcmSendTest()</td>
+<td class="failures">0.104s</td>
+<td class="failures">failed</td>
 </tr>
 </table>
 </div>
 <div class="tab">
 <h2>Standard output</h2>
 <span class="code">
-<pre>17:07:21.996 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests]: AnsimtalkServerApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
-17:07:22.245 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.moviekim.ansimtalk_server.AnsimtalkServerApplication for test class com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests
+<pre>Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+23:04:20.680 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests]: AnsimtalkServerApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+23:04:20.828 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.moviekim.ansimtalk_server.AnsimtalkServerApplication for test class com.moviekim.ansimtalk_server.AnsimtalkServerApplicationTests
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -102,19 +130,19 @@
 
  :: Spring Boot ::                (v3.5.6)
 
-2025-10-25T17:07:23.003+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : Starting AnsimtalkServerApplicationTests using Java 21.0.2 with PID 5608 (started by kim32 in C:\Users\kim32\Desktop\AnsimTalk\ansimtalk-server)
-2025-10-25T17:07:23.006+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : No active profile set, falling back to 1 default profile: &quot;default&quot;
-2025-10-25T17:07:24.127+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2025-10-25T17:07:24.244+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 94 ms. Found 1 JPA repository interface.
-2025-10-25T17:07:25.113+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2025-10-25T17:07:25.243+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.29.Final
-2025-10-25T17:07:25.299+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2025-10-25T17:07:25.922+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2025-10-25T17:07:25.975+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2025-10-25T17:07:26.657+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@6cde0c69
-2025-10-25T17:07:26.665+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2025-10-25T17:07:26.767+09:00  WARN 5608 --- [ansimtalk-server] [    Test worker] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-2025-10-25T17:07:26.827+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+2025-10-27T23:04:21.330+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : Starting AnsimtalkServerApplicationTests using Java 21.0.2 with PID 30892 (started by kim32 in C:\Users\kim32\Desktop\ansimtalk\server)
+2025-10-27T23:04:21.332+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : No active profile set, falling back to 1 default profile: &quot;default&quot;
+2025-10-27T23:04:22.407+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-10-27T23:04:22.519+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 96 ms. Found 1 JPA repository interface.
+2025-10-27T23:04:24.271+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-10-27T23:04:24.356+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.29.Final
+2025-10-27T23:04:24.406+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-10-27T23:04:24.609+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-10-27T23:04:24.648+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-10-27T23:04:25.152+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@783f5f71
+2025-10-27T23:04:25.156+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-10-27T23:04:25.240+09:00  WARN 30892 --- [ansimtalk-server] [    Test worker] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-10-27T23:04:25.276+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
 	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
 	Database driver: undefined/unknown
 	Database version: 8.4.7
@@ -122,17 +150,12 @@
 	Isolation level: undefined/unknown
 	Minimum pool size: undefined/unknown
 	Maximum pool size: undefined/unknown
-2025-10-25T17:07:28.263+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2025-10-25T17:07:28.343+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2025-10-25T17:07:29.498+09:00  WARN 5608 --- [ansimtalk-server] [    Test worker] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
-2025-10-25T17:07:30.407+09:00  INFO 5608 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : Started AnsimtalkServerApplicationTests in 7.892 seconds (process running for 10.052)
-Hibernate: 
-    insert 
-    into
-        users
-        (fcm_token, login_id, name, password, role) 
-    values
-        (?, ?, ?, ?, ?)
+2025-10-27T23:04:26.195+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-10-27T23:04:26.272+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+Firebase가 성공적으로 초기화되었습니다.
+2025-10-27T23:04:26.850+09:00  WARN 30892 --- [ansimtalk-server] [    Test worker] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-10-27T23:04:27.390+09:00  INFO 30892 --- [ansimtalk-server] [    Test worker] c.m.a.AnsimtalkServerApplicationTests    : Started AnsimtalkServerApplicationTests in 6.389 seconds (process running for 7.882)
+PUSH 알림 발송 성공: null
 </pre>
 </span>
 </div>
@@ -155,7 +178,7 @@ WARNING: Dynamic loading of agents will be disallowed by default in a future rel
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="https://www.gradle.org">Gradle 8.14.3</a> at 2025. 10. 25. 오후 5:07:31</p>
+<a href="https://www.gradle.org">Gradle 8.14.3</a> at 2025. 10. 27. 오후 11:04:27</p>
 </div>
 </div>
 </body>
