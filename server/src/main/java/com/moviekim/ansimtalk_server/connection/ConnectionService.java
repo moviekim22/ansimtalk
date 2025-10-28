@@ -1,11 +1,15 @@
 package com.moviekim.ansimtalk_server.connection;
 
+import com.moviekim.ansimtalk_server.connection.dto.ConnectionResponseDto;
 import com.moviekim.ansimtalk_server.user.Role;
 import com.moviekim.ansimtalk_server.user.User;
 import com.moviekim.ansimtalk_server.user.UserService; // <-- UserRepository 대신 UserService를 import
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -38,5 +42,16 @@ public class ConnectionService {
         // 5. 새로운 연결 객체를 만들어 저장한다.
         Connection newConnection = new Connection(elderly, guardian);
         connectionRepository.save(newConnection);
+    }
+
+    public List<ConnectionResponseDto> getConnectedElderlyList(Long guardianId) {
+        // 1. Repository를 통해 특정 보호자와 연결된 모든 Connection 목록을 DB에서 가져온다.
+        List<Connection> connections = connectionRepository.findAllByGuardianId(guardianId);
+
+        // 2. 가져온 Connection 목록을 순회하면서,
+        //    각 Connection에 들어있는 어르신(User) 정보를 DTO로 변환한다.
+        return connections.stream()
+                .map(connection -> new ConnectionResponseDto(connection.getElderly()))
+                .collect(Collectors.toList());
     }
 }

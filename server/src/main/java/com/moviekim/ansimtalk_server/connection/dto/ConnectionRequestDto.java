@@ -1,4 +1,4 @@
-package com.moviekim.ansimtalk_server.connection;
+package com.moviekim.ansimtalk_server.connection.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
