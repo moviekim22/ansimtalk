@@ -8,17 +8,22 @@ import org.springframework.stereotype.Service;
 public class UserService {
     private final UserRepository userRepository;
 
-    public void create(String loginId, String password, String name, Role role){
+    public User create(String loginId, String password, String name, Role role){
         User user = new User();
         user.setLoginId(loginId);
         user.setPassword(password);
         user.setName(name);
         user.setRole(role);
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 
-    public User getUser(String loginId) {
-        return this.userRepository.findByLoginId(loginId)
-                .orElseThrow();
+    public User getUserById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("해당 ID의 사용자를 찾을 수 없습니다. ID: " + id));
+    }
+
+    public User getUserByLoginId(String loginId) {
+        return userRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 아이디의 사용자를 찾을 수 없습니다."));
     }
 }
