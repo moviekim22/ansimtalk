@@ -9,6 +9,14 @@ import android.location.Location
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import kotlin.math.sqrt
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -93,6 +101,14 @@ fun AnsimTalkApp() {
 
     val showBottomBar = currentDestination !in listOf(AppDestinations.LOGIN, AppDestinations.SIGN_UP)
 
+    // --- 낙상 감지 기능 관리자 추가 ---
+    FallDetectionManager {
+        // 낙상이 감지되면 실행될 람다 함수
+        // 여기서는 긴급 전화 카드에 있는 다이얼로그를 직접 띄우는 대신,
+        // 낙상 감지 전용 다이얼로그를 띄우는 것이 좋지만, 우선은 간단하게 Log로 확인합니다.
+        android.util.Log.d("FallDetection", "낙상 감지! 확인 절차 시작 필요.")
+        // TODO: 낙상 감지 시 확인 다이얼로그 띄우기
+    }
     // --- 약 목록 상태를 최상위로 이동 ---
     val medicationList = remember {
         mutableStateListOf(
@@ -129,6 +145,79 @@ fun AnsimTalkApp() {
         )
     }
 }
+@Composable
+fun FallDetectionManager(onFallDetected: () -> Unit) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 센서 관리자와 리스너 상태 저장
+    val sensorManager = remember {
+        context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    }
+    val accelerometer = remember {
+        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+    }
+
+    // 낙상 감지 알고리즘을 위한 상태 변수
+    var freeFallDetected by remember { mutableStateOf(false) }
+    var lastFreeFallTime by remember { mutableLongStateOf(0L) }
+
+    val sensorEventListener = remember {
+        object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
+                    val x = event.values[0]
+                    val y = event.values[1]
+                    val z = event.values[2]
+
+                    // 가속도 벡터의 크기 계산
+                    val magnitude = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+
+                    // 1. 자유 낙하 감지 (가속도 크기가 매우 작을 때)
+                    if (magnitude < 2.0f) {
+                        freeFallDetected = true
+                        lastFreeFallTime = System.currentTimeMillis()
+                    }
+
+                    // 2. 충격 감지 (가속도 크기가 매우 클 때)
+                    if (magnitude > 15.0f) {
+                        // 자유 낙하가 감지된 후 1초 이내에 강한 충격이 왔는지 확인
+                        if (freeFallDetected && (System.currentTimeMillis() - lastFreeFallTime < 1000)) {
+                            onFallDetected() // 낙상 감지 콜백 호출
+                        }
+                        // 상태 초기화
+                        freeFallDetected = false
+                    }
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+                // 사용하지 않음
+            }
+        }
+    }
+
+    // Composable의 생명주기에 맞춰 센서 리스너 등록 및 해제
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // 앱이 화면에 보일 때 센서 리스너 등록
+                sensorManager.registerListener(sensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL)
+            } else if (event == Lifecycle.Event.ON_PAUSE) {
+                // 앱이 화면에서 사라질 때 리스너 해제 (배터리 절약)
+                sensorManager.unregisterListener(sensorEventListener)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        // Composable이 사라질 때 최종적으로 리스너 해제
+        onDispose {
+            sensorManager.unregisterListener(sensorEventListener)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+}
+
 
 @Composable
 fun AppNavHost(
