@@ -66,4 +66,11 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
     implementation("com.google.firebase:firebase-messaging-ktx")
     implementation("com.google.firebase:firebase-analytics")
+
+    // 1. Retrofit 본체
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    // 2. JSON을 데이터 클래스로 변환해주는 도구 (Gson)
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // 3. 통신 과정을 로그로 보여주는 도구 (디버깅 필수!)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
 }

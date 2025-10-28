@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.google.firebase.messaging.FirebaseMessaging // <-- 추가
 import com.moviekim.ansimtalk.guardian.ui.home.HomeScreen
+import com.moviekim.ansimtalk.guardian.ui.settings.SettingsScreen
 import com.moviekim.ansimtalk.guardian.ui.theme.GuardianappTheme
 
 class MainActivity : ComponentActivity() {
@@ -31,7 +32,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             GuardianappTheme {
-                HomeScreen()
+                SettingsScreen()
             }
         }
     }
