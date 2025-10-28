@@ -5,18 +5,14 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Location
-import android.net.Uri
-import android.os.Bundle
-import android.widget.Toast
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import kotlin.math.sqrt
+import android.location.Location
+import android.net.Uri
+import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -46,22 +42,32 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.myapplication.network.RetrofitInstance
+import com.example.myapplication.network.StatusRequest
+import com.example.myapplication.network.UserInfo
+import com.example.myapplication.network.UserResponse
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.delay
+import retrofit2.Call
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.sqrt
 
 // 약 정보를 담을 데이터 클래스
 data class Medication(
@@ -101,14 +107,63 @@ fun AnsimTalkApp() {
 
     val showBottomBar = currentDestination !in listOf(AppDestinations.LOGIN, AppDestinations.SIGN_UP)
 
-    // --- 낙상 감지 기능 관리자 추가 ---
+    // --- 낙상 감지 다이얼로그를 위한 상태 ---
+    var showFallDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // --- 낙상 감지 기능 관리자 ---
     FallDetectionManager {
-        // 낙상이 감지되면 실행될 람다 함수
-        // 여기서는 긴급 전화 카드에 있는 다이얼로그를 직접 띄우는 대신,
-        // 낙상 감지 전용 다이얼로그를 띄우는 것이 좋지만, 우선은 간단하게 Log로 확인합니다.
-        android.util.Log.d("FallDetection", "낙상 감지! 확인 절차 시작 필요.")
-        // TODO: 낙상 감지 시 확인 다이얼로그 띄우기
+        // 낙상이 감지되면 다이얼로그를 띄우도록 상태 변경
+        showFallDialog = true
     }
+
+    // --- 낙상 감지 다이얼로그 ---
+    if (showFallDialog) {
+        var countdown by remember { mutableIntStateOf(15) }
+
+        // 1초마다 카운트다운을 줄이는 효과
+        LaunchedEffect(Unit) {
+            while (countdown > 0) {
+                delay(1000)
+                countdown--
+            }
+            // 카운트다운이 끝나면 (응답이 없으면) 긴급 신고 절차 시작
+            showFallDialog = false
+            initiateEmergencyCall(context)
+        }
+
+        AlertDialog(
+            onDismissRequest = { /* 바깥 클릭으로 닫기 비활성화 */ },
+            title = { Text("낙상 감지!", color = Color.Red, fontWeight = FontWeight.Bold) },
+            text = { Text("괜찮으신가요? $countdown 초 후 자동으로 119에 신고됩니다.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // "괜찮아요" 버튼을 누르면 다이얼로그만 닫음
+                        showFallDialog = false
+                    },
+                    // 버튼 크기를 키워서 누르기 쉽게 함
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("괜찮아요", fontSize = 18.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        // "신고하기"를 누르면 즉시 긴급 신고 절차 시작
+                        showFallDialog = false
+                        initiateEmergencyCall(context)
+                    }
+                ) {
+                    Text("즉시 신고하기", color = Color.Red)
+                }
+            }
+        )
+    }
+
     // --- 약 목록 상태를 최상위로 이동 ---
     val medicationList = remember {
         mutableStateListOf(
@@ -248,10 +303,10 @@ fun AppNavHost(
         composable(AppDestinations.MEDICATION) {
             MedicationScreen(navController, medicationList, onAddMedication, onTakePill, onRemoveMedication)
         }
+        // --- 바로 이 부분의 내용을 교체하는 것입니다 ---
         composable(AppDestinations.SETTINGS) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("설정 화면")
-            }
+            // 기존 Box 대신 우리가 만든 SettingsScreen을 호출
+            SettingsScreen()
         }
     }
 }
@@ -470,8 +525,6 @@ fun EmergencyCallCard() {
                             }
                             else -> {
                                 // 전화 권한이 없는 경우 사용자에게 알림.
-                                // 안드로이드 정책상 전화 권한은 런타임에 직접 요청할 수 없으므로,
-                                // 사용자가 직접 설정에서 켜도록 유도해야 함.
                                 Toast.makeText(context, "전화 권한이 필요합니다. 앱 설정에서 권한을 허용해주세요.", Toast.LENGTH_LONG).show()
                             }
                         }
@@ -562,7 +615,6 @@ private fun initiateEmergencyCall(context: Context) {
         .addOnFailureListener {
             android.util.Log.e("EmergencyCall", "위치 정보 요청 실패", it)
             Toast.makeText(context, "위치 정보를 가져오는 데 실패했습니다.", Toast.LENGTH_SHORT).show()
-
             // 위치 정보 실패 시에도 전화는 걸도록 처리
             try {
                 val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:119"))
@@ -571,8 +623,6 @@ private fun initiateEmergencyCall(context: Context) {
                 Toast.makeText(context, "전화 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
             }
         }
-
-
 }
 
 @Composable
@@ -633,20 +683,18 @@ fun MedicationCard(navController: NavController, takenCount: Int, totalCount: In
 @Composable
 fun SafetyCheckScreen(navController: NavController) {
     var selectedMood by remember { mutableStateOf<String?>(null) }
-    // --- 전송 완료 다이얼로그를 띄울지 결정하는 상태 추가 ---
     var showConfirmationDialog by remember { mutableStateOf(false) }
 
-    // --- (2) 전송 완료 다이얼로그가 표시되어야 할 때 AlertDialog를 띄움 ---
     if (showConfirmationDialog) {
         AlertDialog(
-            onDismissRequest = { /* 다이얼로그 바깥 클릭시 아무것도 안함 */ },
+            onDismissRequest = { /* 바깥 클릭으로 닫기 비활성화 */ },
             title = { Text("전송 완료") },
             text = { Text("오늘의 안부가 보호자에게 안전하게 전달되었습니다.") },
             confirmButton = {
                 Button(
                     onClick = {
-                        showConfirmationDialog = false // 다이얼로그 닫기
-                        navController.popBackStack()   // 홈 화면으로 돌아가기
+                        showConfirmationDialog = false
+                        navController.popBackStack()
                     }
                 ) {
                     Text("확인")
@@ -692,7 +740,6 @@ fun SafetyCheckScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // MoodOption들은 기존과 동일
                     MoodOption(
                         text = "좋아요",
                         icon = Icons.Outlined.SentimentVerySatisfied,
@@ -718,15 +765,29 @@ fun SafetyCheckScreen(navController: NavController) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
-                        // --- (1) 확인 완료 버튼 클릭 시 로직 수정 ---
                         onClick = {
                             selectedMood?.let { mood ->
-                                // [나중에 연동할 부분] 보호자 앱으로 데이터 전송하는 로직
-                                // 지금은 Logcat에 출력하여 확인합니다.
-                                android.util.Log.d("SafetyCheck", "보호자에게 전송될 기분: $mood")
+                                // --- 레트로핏을 이용한 서버 통신 코드 ---
+                                val request = StatusRequest(userId = 1L, status = mood) // userId는 임시로 1
+                                RetrofitInstance.api.sendStatus(request).enqueue(object : retrofit2.Callback<Void> {
+                                    override fun onResponse(call: Call<Void>, response: retrofit2.Response<Void>) {
+                                        if (response.isSuccessful) {
+                                            // 서버와 통신이 성공했을 때
+                                            android.util.Log.d("SafetyCheck", "서버 전송 성공: $mood")
+                                            showConfirmationDialog = true // 성공 알림 다이얼로그 띄우기
+                                        } else {
+                                            // 서버가 요청을 받았지만, 에러 코드를 응답했을 때 (예: 404, 500)
+                                            android.util.Log.e("SafetyCheck", "서버 응답 실패: ${response.code()}")
+                                            // TODO: 사용자에게 "전송에 실패했습니다." 알림 보여주기
+                                        }
+                                    }
 
-                                // 전송이 완료되었으므로, 확인 다이얼로그를 띄우도록 상태 변경
-                                showConfirmationDialog = true
+                                    override fun onFailure(call: Call<Void>, t: Throwable) {
+                                        // 서버에 아예 연결조차 되지 않았을 때 (네트워크 오류, 서버 꺼짐, 주소 틀림 등)
+                                        android.util.Log.e("SafetyCheck", "서버 연결 실패", t)
+                                        // TODO: 사용자에게 "네트워크 연결을 확인해주세요." 알림 보여주기
+                                    }
+                                })
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -1037,6 +1098,89 @@ fun WeeklyLogItem(date: String, progress: String, completed: Boolean = false) {
         } else {
             Icon(Icons.Default.Error, contentDescription = "미완료", tint = Color.Red.copy(alpha = 0.7f))
         }
+    }
+}
+
+// --- ★★★★★ 새로 추가된 설정 화면 ★★★★★ ---
+@Composable
+fun SettingsScreen() {
+    // 서버로부터 받아올 사용자 정보를 저장할 상태 변수
+    // 처음에는 비어있다가, 통신 성공 후 데이터로 채워짐
+    var userInfo by remember { mutableStateOf<UserInfo?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // SettingsScreen이 처음 실행될 때 서버에 딱 한 번만 데이터 요청
+    LaunchedEffect(Unit) {
+        // 실제로는 로그인된 사용자 ID를 사용해야 하지만, 지금은 1로 고정
+        val userId = 1L
+        RetrofitInstance.api.getUserInfo(userId).enqueue(object : retrofit2.Callback<UserResponse> {
+            override fun onResponse(call: Call<UserResponse>, response: retrofit2.Response<UserResponse>) {
+                if (response.isSuccessful && response.body() != null) {
+                    // 통신 성공 시, 응답받은 데이터를 userInfo 상태에 저장
+                    userInfo = response.body()!!.data
+                } else {
+                    // 통신은 됐지만, 서버가 에러를 보냈을 때
+                    errorMessage = "정보를 불러오는 데 실패했습니다."
+                    // 친구의 서버가 아직 준비 안됐을 때 테스트하는 방법
+                    // 아래 두 줄의 주석을 풀면, 가짜 데이터로 화면을 테스트할 수 있습니다.
+                    errorMessage = null
+                    userInfo = UserInfo(userId = 1L, username = "user123", name = "홍길동 (가짜)")
+                }
+            }
+
+            override fun onFailure(call: Call<UserResponse>, t: Throwable) {
+                // 통신 자체가 실패했을 때 (네트워크 오류, 서버 꺼짐 등)
+                errorMessage = "네트워크 연결을 확인해주세요."
+                // 친구의 서버가 아직 준비 안됐을 때 테스트하는 방법
+                // 아래 두 줄의 주석을 풀면, 가짜 데이터로 화면을 테스트할 수 있습니다.
+                errorMessage = null
+                userInfo = UserInfo(userId = 1L, username = "user123", name = "홍길동 (가짜)")
+            }
+        })
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("설정", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("내 정보", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // userInfo가 아직 null이면 로딩 중 표시
+                if (userInfo == null && errorMessage == null) {
+                    CircularProgressIndicator()
+                } else if (errorMessage != null) {
+                    // 에러가 발생하면 에러 메시지 표시
+                    Text(errorMessage!!, color = Color.Red)
+                } else {
+                    // 정보가 있으면 화면에 표시
+                    InfoRow(label = "이름", value = userInfo!!.name)
+                    InfoRow(label = "아이디", value = userInfo!!.username)
+                }
+            }
+        }
+        // TODO: 로그아웃, 앱 버전 정보 등 다른 설정 메뉴 추가
+    }
+}
+
+@Composable
+fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.width(80.dp))
+        Text(value)
     }
 }
 

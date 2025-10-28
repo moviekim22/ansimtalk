@@ -40,6 +40,12 @@ android {
 }
 
 dependencies {
+    // Retrofit: 서버 통신을 위한 라이브러리
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    // Gson Converter: 서버와 주고받는 데이터(JSON)를 코틀린 객체로 변환해주는 도구
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // OkHttp Logging Interceptor: 통신 과정을 로그로 확인하기 위한 도구 (개발에 매우 유용)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
 
 
     // Google Play 서비스의 위치 정보 라이브러리
