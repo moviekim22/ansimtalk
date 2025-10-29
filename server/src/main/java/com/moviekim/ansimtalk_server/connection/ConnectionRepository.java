@@ -12,4 +12,6 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
 
     // 보호자 ID로 모든 연결 정보를 리스트 형태로 찾아오는 기능
     List<Connection> findAllByGuardianId(Long guardianId);
+
+    List<Connection> findAllByElderlyId(Long elderlyId);
 }
