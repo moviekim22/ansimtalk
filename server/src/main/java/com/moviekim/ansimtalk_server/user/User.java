@@ -10,10 +10,16 @@ import lombok.Setter;
 
 @Entity
 @Getter
-@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "users") // 데이터베이스 테이블 이름 'users'로 지정
 public class User {
+
+    public User(String loginId, String password, String name, Role role){
+        this.loginId = loginId;
+        this.password = password;
+        this.name = name;
+        this.role = role;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -18,6 +18,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.messaging.FirebaseMessaging
+import com.moviekim.ansimtalk.guardian.ui.auth.LoginScreen
+import com.moviekim.ansimtalk.guardian.ui.auth.SignUpScreen
 import com.moviekim.ansimtalk.guardian.ui.home.HomeScreen
 import com.moviekim.ansimtalk.guardian.ui.settings.SettingsScreen
 import com.moviekim.ansimtalk.guardian.ui.theme.GuardianappTheme
@@ -43,10 +45,24 @@ class MainActivity : ComponentActivity() {
         setContent {
             GuardianappTheme {
                 val navController = rememberNavController()
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
+
                 Scaffold(
-                    bottomBar = { BottomNavigationBar(navController = navController) }
+                    bottomBar = {
+                        // 로그인/회원가입 화면에서는 바텀 네비게이션 숨기기
+                        if (currentRoute != "login" && currentRoute != "signup") {
+                            BottomNavigationBar(navController = navController)
+                        }
+                    }
                 ) {
-                    NavHost(navController = navController, startDestination = "home") {
+                    NavHost(navController = navController, startDestination = "login") {
+                        composable("login") {
+                            LoginScreen(navController)
+                        }
+                        composable("signup") {
+                            SignUpScreen(navController)
+                        }
                         composable("home") {
                             HomeScreen()
                         }

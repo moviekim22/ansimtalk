@@ -15,53 +15,60 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moviekim.ansimtalk.guardian.ui.theme.GuardianappTheme
+import com.moviekim.ansimtalk.guardian.ui.util.SessionManager
+import java.text.SimpleDateFormat
+import java.util.*
 
 val StatusGreen = Color(0xFF4CAF50)
 val StatusRed = Color(0xFFD32F2F)
 val StatusGray = Color(0xFFBDBDBD)
 val BackgroundGray = Color(0xFFF5F5F5)
 
-// 메인 화면 전체를 구성하는 Composable
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
-    // Column을 스크롤 가능하게 만듭니다.
+    val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
+    val userName = sessionManager.getUserName() ?: "보호자"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundGray)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp) // 카드 사이의 간격
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp)) // 상단 여백
-        CurrentStatusCard(isSafe = true) // true: 안전, false: 위험
+        TopAppBar(userName = userName)
+        Spacer(modifier = Modifier.height(8.dp))
+        CurrentStatusCard(isSafe = true)
         QuickContactCard()
         DailyCheckInCard(isChecked = true)
         MedicationCard()
-        Spacer(modifier = Modifier.height(8.dp)) // 하단 여백
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
-// 상단 앱 바
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopAppBar() {
+fun TopAppBar(userName: String) {
+    val currentDate = SimpleDateFormat("yyyy년 MM월 dd일 E요일", Locale.getDefault()).format(Date())
+
     TopAppBar(
         title = {
             Column {
                 Text(
-                    "김어르신",
+                    text = "${userName}님",
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 )
                 Text(
-                    "2025년 10월 27일 월요일",
+                    text = currentDate,
                     fontSize = 14.sp,
                     color = Color.Gray
                 )
@@ -71,7 +78,6 @@ fun TopAppBar() {
     )
 }
 
-// 1. 현재 상태 카드
 @Composable
 fun CurrentStatusCard(isSafe: Boolean) {
     val statusColor = if (isSafe) StatusGreen else StatusRed
@@ -93,7 +99,6 @@ fun CurrentStatusCard(isSafe: Boolean) {
     }
 }
 
-// 2. 빠른 연락 카드
 @Composable
 fun QuickContactCard() {
     Card(
@@ -114,7 +119,6 @@ fun QuickContactCard() {
     }
 }
 
-// 빠른 연락 카드에 들어가는 버튼
 @Composable
 fun ContactButton(icon: ImageVector, text: String) {
     Button(
@@ -133,7 +137,6 @@ fun ContactButton(icon: ImageVector, text: String) {
     }
 }
 
-// 3. 오늘의 안부 확인 카드
 @Composable
 fun DailyCheckInCard(isChecked: Boolean) {
     InfoCard(icon = Icons.Default.Check, title = "오늘의 안부 확인") {
@@ -151,7 +154,6 @@ fun DailyCheckInCard(isChecked: Boolean) {
     }
 }
 
-// 4. 오늘의 약 복용 카드
 @Composable
 fun MedicationCard() {
     InfoCard(icon = Icons.Default.Info, title = "오늘의 약 복용") {
@@ -163,7 +165,6 @@ fun MedicationCard() {
     }
 }
 
-// 약 복용 카드에 들어가는 개별 항목
 @Composable
 fun MedicationItem(time: String, name: String, isTaken: Boolean) {
     Row(
@@ -182,7 +183,6 @@ fun MedicationItem(time: String, name: String, isTaken: Boolean) {
     }
 }
 
-// '복용 완료', '확인 완료' 등을 표시하는 작은 태그 (재사용 가능)
 @Composable
 fun StatusChip(text: String, isCompleted: Boolean) {
     val backgroundColor = if (isCompleted) StatusGreen else StatusGray
@@ -198,7 +198,6 @@ fun StatusChip(text: String, isCompleted: Boolean) {
     )
 }
 
-// 모든 카드의 기본 틀 (재사용 가능)
 @Composable
 fun InfoCard(
     icon: ImageVector,
@@ -236,8 +235,6 @@ fun InfoCard(
     }
 }
 
-
-// Android Studio에서 미리보기를 위한 코드
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
