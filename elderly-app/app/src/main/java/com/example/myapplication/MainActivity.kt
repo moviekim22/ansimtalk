@@ -1,9 +1,11 @@
+// 기존 import 문을 모두 지우고 아래 내용으로 완전히 교체하세요.
+
 package com.example.myapplication
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -11,12 +13,14 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.telephony.SmsManager
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,8 +38,6 @@ import androidx.compose.material.icons.outlined.SentimentNeutral
 import androidx.compose.material.icons.outlined.SentimentVerySatisfied
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,9 +67,35 @@ import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.delay
 import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.sqrt
+
+// import 문 정리 완료. 이 아래부터는 클래스와 함수들이 위치합니다.
+
+// 보호자 연락처를 관리하는 싱글톤 객체
+object GuardianContactManager {
+    private const val PREFS_NAME = "ansimtalk_prefs"
+    private const val KEY_GUARDIAN_PHONE = "guardian_phone"
+
+    private fun getPreferences(context: Context): SharedPreferences {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    // 보호자 연락처 저장
+    fun saveGuardianPhone(context: Context, phoneNumber: String) {
+        val editor = getPreferences(context).edit()
+        editor.putString(KEY_GUARDIAN_PHONE, phoneNumber)
+        editor.apply()
+    }
+
+    // 보호자 연락처 불러오기
+    fun getGuardianPhone(context: Context): String? {
+        return getPreferences(context).getString(KEY_GUARDIAN_PHONE, null)
+    }
+}
 
 // 약 정보를 담을 데이터 클래스
 data class Medication(
@@ -90,7 +118,10 @@ object AppDestinations {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+
+        // --- 임시로 보호자 연락처를 저장하는 코드 추가 ---
+        // TODO: 실제 앱에서는 설정 화면에서 이 기능을 구현해야 합니다.
+        GuardianContactManager.saveGuardianPhone(this, "010-2312-1851") // 여기에 테스트할 보호자 번호를 입력하세요.
         setContent {
             MyApplicationTheme {
                 AnsimTalkApp()
@@ -475,63 +506,48 @@ fun Header() {
 @Composable
 fun EmergencyCallCard() {
     // --- 상태 관리 ---
-    // 다이얼로그를 보여줄지 결정하는 상태
     var showEmergencyDialog by remember { mutableStateOf(false) }
-    // 현재 컨텍스트를 가져옴
     val context = LocalContext.current
 
-    // --- 위치 권한 요청을 위한 런처 ---
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
+    // --- [수정] 위치 및 SMS 권한 요청을 위한 런처로 변경 ---
+    val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = { permissions ->
-            if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
-                permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)) {
-                // 권한이 승인되면 긴급 신고 절차 진행
+            val isLocationGranted = permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
+                    permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
+
+            if (isLocationGranted) {
+                // 위치 권한이 승인되면 긴급 신고 절차(SMS 전송) 진행
                 initiateEmergencyCall(context)
             } else {
-                // 권한이 거부되면 사용자에게 알림
-                Toast.makeText(context, "위치 권한이 없어 위치 전송이 불가능합니다.", Toast.LENGTH_SHORT).show()
-                // 위치 정보 없이 전화만 걸도록 처리
-                try {
-                    val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:119"))
-                    context.startActivity(callIntent)
-                } catch (e: SecurityException) {
-                    Toast.makeText(context, "전화 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
-                }
+                // 위치 권한이 거부되면 사용자에게 알림
+                Toast.makeText(context, "위치 권한이 거부되어 위치 전송이 불가능합니다.", Toast.LENGTH_LONG).show()
             }
         }
     )
 
-    // --- 긴급 신고 확인 다이얼로그 ---
+    // --- [수정] 긴급 신고 확인 다이얼로그 내용 변경 ---
     if (showEmergencyDialog) {
         AlertDialog(
             onDismissRequest = { showEmergencyDialog = false },
-            title = { Text("긴급 신고", color = Color.Red, fontWeight = FontWeight.Bold) },
-            text = { Text("정말로 119에 신고하고 보호자에게 위치를 전송하시겠습니까?") },
+            title = { Text("긴급 상황 알림", color = Color.Red, fontWeight = FontWeight.Bold) },
+            text = { Text("정말로 보호자에게 현재 위치를 문자로 전송하시겠습니까?") },
             confirmButton = {
                 Button(
                     onClick = {
                         showEmergencyDialog = false
-                        // --- 전화 권한 확인 ---
-                        when (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE)) {
-                            PackageManager.PERMISSION_GRANTED -> {
-                                // 전화 권한이 있으면 위치 권한 확인 시작
-                                locationPermissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                            }
-                            else -> {
-                                // 전화 권한이 없는 경우 사용자에게 알림.
-                                Toast.makeText(context, "전화 권한이 필요합니다. 앱 설정에서 권한을 허용해주세요.", Toast.LENGTH_LONG).show()
-                            }
-                        }
+                        // [수정] 위치와 SMS 권한을 함께 요청
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.SEND_SMS // SMS 권한 추가
+                            )
+                        )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
-                    Text("신고")
+                    Text("전송") // 버튼 텍스트 변경
                 }
             },
             dismissButton = {
@@ -578,7 +594,7 @@ fun EmergencyCallCard() {
 private fun initiateEmergencyCall(context: Context) {
     val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
-    // 위치 권한이 있는지 다시 한 번 명시적으로 확인 (매우 중요)
+    // 위치 권한이 있는지 다시 한 번 명시적으로 확인
     if (ActivityCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION
@@ -587,43 +603,66 @@ private fun initiateEmergencyCall(context: Context) {
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) != PackageManager.PERMISSION_GRANTED
     ) {
-        return // 권한이 없으면 함수 종료
+        Toast.makeText(context, "위치 권한이 없어 보호자에게 위치를 전송할 수 없습니다.", Toast.LENGTH_LONG).show()
+        return
     }
 
-    // 마지막으로 알려진 위치를 가져옴
     fusedLocationClient.lastLocation
         .addOnSuccessListener { location: Location? ->
             val locationText = if (location != null) {
                 "위도: ${location.latitude}, 경도: ${location.longitude}"
             } else {
-                "위치 정보를 가져올 수 없습니다."
+                "위치 정보를 가져올 수 없습니다. 확인이 필요합니다."
+            }
+            val message = "어르신에게 긴급 상황이 발생했습니다! 현재 위치: $locationText"
+
+            val guardianPhone = GuardianContactManager.getGuardianPhone(context)
+
+            if (!guardianPhone.isNullOrEmpty()) {
+                try {
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+                        // --- [수정] SmsManager를 최신 방식으로 가져오기 ---
+                        val smsManager: SmsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            context.getSystemService(SmsManager::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            SmsManager.getDefault()
+                        }
+                        // --- 여기까지 수정 ---
+
+                        smsManager.sendTextMessage(guardianPhone, null, message, null, null)
+                        Toast.makeText(context, "보호자에게 긴급 상황 문자를 전송했습니다.", Toast.LENGTH_LONG).show()
+                        Log.d("EmergencyCall", "SMS 전송 완료: $message")
+                    } else {
+                        Toast.makeText(context, "SMS 전송 권한이 필요합니다. 앱 설정에서 권한을 허용해주세요.", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "SMS 전송에 실패했습니다.", Toast.LENGTH_SHORT).show()
+                    Log.e("EmergencyCall", "SMS 전송 실패", e)
+                }
+            } else {
+                Toast.makeText(context, "등록된 보호자 연락처가 없습니다.", Toast.LENGTH_SHORT).show()
             }
 
-            // [보호자 앱 연동 부분] Logcat에 위치 정보 출력
-            android.util.Log.d("EmergencyCall", "긴급 상황! 보호자에게 위치 전송: $locationText")
-            Toast.makeText(context, "보호자에게 위치를 전송했습니다.", Toast.LENGTH_LONG).show()
-
-            // 119에 전화 걸기
+            // --- [확인] 119 전화 거는 기능 주석 처리 ---
+            /*
             try {
                 val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:119"))
                 context.startActivity(callIntent)
             } catch (e: Exception) {
-                android.util.Log.e("EmergencyCall", "전화 걸기 실패", e)
+                Log.e("EmergencyCall", "전화 걸기 실패", e)
                 Toast.makeText(context, "전화를 걸 수 없습니다.", Toast.LENGTH_SHORT).show()
             }
+            */
+            Log.d("EmergencyCall", "119 전화 기능은 현재 비활성화되어 있습니다.")
+
         }
         .addOnFailureListener {
-            android.util.Log.e("EmergencyCall", "위치 정보 요청 실패", it)
+            Log.e("EmergencyCall", "위치 정보 요청 실패", it)
             Toast.makeText(context, "위치 정보를 가져오는 데 실패했습니다.", Toast.LENGTH_SHORT).show()
-            // 위치 정보 실패 시에도 전화는 걸도록 처리
-            try {
-                val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:119"))
-                context.startActivity(callIntent)
-            } catch (e: SecurityException) {
-                Toast.makeText(context, "전화 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
-            }
         }
 }
+
 
 @Composable
 fun SafetyCheckCard(navController: NavController) {
