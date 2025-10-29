@@ -42,4 +42,28 @@ public class EventService {
             }
         }
     }
+
+    public void sendEmergencyAlert(Long elderlyId) {
+        // 1. 어떤 어르신에게서 이벤트가 발생했는지 DB에서 찾는다.
+        User elderly = userService.getUserById(elderlyId);
+
+        // 2. 이 어르신과 연결된 모든 보호자를 DB에서 찾는다.
+        List<Connection> connections = connectionRepository.findAllByElderlyId(elderly.getId());
+
+        if (connections.isEmpty()) {
+            System.out.println("WARN: " + elderly.getName() + "님에게 연결된 보호자가 없습니다.");
+            return;
+        }
+
+        // 3. 찾은 모든 보호자에게 PUSH 알림을 보낸다.
+        System.out.println(elderly.getName() + "님과 연결된 " + connections.size() + "명의 보호자에게 알림을 보냅니다.");
+        for (Connection connection : connections) {
+            User guardian = connection.getGuardian();
+            if (guardian.getFcmToken() != null && !guardian.getFcmToken().isEmpty()) {
+                String title = "🚨 긴급 상황 발생!";
+                String body = elderly.getName() + "님에게 도움이 필요합니다! 즉시 확인해주세요.";
+                fcmService.sendNotification(guardian.getFcmToken(), title, body);
+            }
+        }
+    }
 }

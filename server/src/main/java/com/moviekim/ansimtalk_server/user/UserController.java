@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.moviekim.ansimtalk_server.user.dto.FcmTokenRequestDto;
+import org.springframework.web.bind.annotation.PutMapping;
 
 @RestController
 @RequestMapping("/api/users")
@@ -39,5 +41,12 @@ public class UserController {
 
         // DTO 객체를 JSON으로 반환
         return ResponseEntity.ok(responseDto);
+    }
+
+    @PutMapping("/fcm-token")
+    public ResponseEntity<String> updateFcmToken(@RequestBody FcmTokenRequestDto requestDto) {
+        // DTO에서 userId와 fcmToken을 꺼내서 서비스에 전달합니다.
+        userService.updateFcmToken(requestDto.getUserId(), requestDto.getFcmToken());
+        return ResponseEntity.ok().build();
     }
 }

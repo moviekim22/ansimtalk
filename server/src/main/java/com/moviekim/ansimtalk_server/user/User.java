@@ -38,5 +38,7 @@ public class User {
     @Column(nullable = false)
     private Role role; // 역할 [어르신, 보호자]
 
+    @Setter
     private String fcmToken; // PUSH 알림을 위한 FCM 토큰
+
 }

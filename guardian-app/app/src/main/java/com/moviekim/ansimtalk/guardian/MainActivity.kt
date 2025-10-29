@@ -1,7 +1,6 @@
 package com.moviekim.ansimtalk.guardian
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -17,7 +16,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.google.firebase.messaging.FirebaseMessaging
 import com.moviekim.ansimtalk.guardian.ui.auth.LoginScreen
 import com.moviekim.ansimtalk.guardian.ui.auth.SignUpScreen
 import com.moviekim.ansimtalk.guardian.ui.home.HomeScreen
@@ -26,20 +24,9 @@ import com.moviekim.ansimtalk.guardian.ui.theme.GuardianappTheme
 
 class MainActivity : ComponentActivity() {
 
-    private val TAG = "FCM_Main"
-
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w(TAG, "FCM 토큰 가져오기 실패", task.exception)
-                return@addOnCompleteListener
-            }
-            val token = task.result
-            Log.d(TAG, "현재 FCM 토큰: $token")
-        }
 
         enableEdgeToEdge()
         setContent {

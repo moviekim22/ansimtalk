@@ -1,5 +1,6 @@
 package com.moviekim.ansimtalk.guardian.ui.auth
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +15,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.messaging.FirebaseMessaging
 import com.moviekim.ansimtalk.guardian.ui.api.RetrofitClient
+import com.moviekim.ansimtalk.guardian.ui.dto.FcmTokenRequest
 import com.moviekim.ansimtalk.guardian.ui.dto.LoginResponse
 import com.moviekim.ansimtalk.guardian.ui.dto.UserLoginRequest
 import com.moviekim.ansimtalk.guardian.ui.theme.GuardianappTheme
@@ -63,10 +66,35 @@ fun LoginScreen(navController: NavController) {
                 RetrofitClient.apiService.login(loginRequest).enqueue(object : Callback<LoginResponse> {
                     override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
                         if (response.isSuccessful) {
-                            response.body()?.let {
-                                // 로그인 성공 시 사용자 정보 저장
-                                sessionManager.saveUser(it)
-                                Toast.makeText(context, "${it.name}님 환영합니다!", Toast.LENGTH_SHORT).show()
+                            response.body()?.let { user ->
+                                // 1. 로그인 성공 정보 저장
+                                sessionManager.saveUser(user)
+
+                                // 2. FCM 토큰 가져와서 서버로 전송
+                                FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                                    if (!task.isSuccessful) {
+                                        Log.w("FCM", "FCM 토큰 가져오기 실패", task.exception)
+                                        return@addOnCompleteListener
+                                    }
+                                    val token = task.result
+                                    val tokenRequest = FcmTokenRequest(userId = user.id, fcmToken = token)
+
+                                    RetrofitClient.apiService.updateFcmToken(tokenRequest).enqueue(object : Callback<Void> {
+                                        override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                                            if(response.isSuccessful) {
+                                                Log.d("FCM", "FCM 토큰 서버에 성공적으로 등록")
+                                            } else {
+                                                Log.e("FCM", "FCM 토큰 서버 등록 실패")
+                                            }
+                                        }
+                                        override fun onFailure(call: Call<Void>, t: Throwable) {
+                                            Log.e("FCM", "FCM 토큰 등록 API 호출 실패", t)
+                                        }
+                                    })
+                                }
+
+                                // 3. 화면 전환
+                                Toast.makeText(context, "${user.name}님 환영합니다!", Toast.LENGTH_SHORT).show()
                                 navController.navigate("home") {
                                     popUpTo("login") { inclusive = true }
                                 }

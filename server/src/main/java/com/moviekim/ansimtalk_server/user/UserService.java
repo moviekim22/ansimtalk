@@ -45,4 +45,11 @@ public class UserService {
         return userRepository.findByLoginId(loginId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 아이디의 사용자를 찾을 수 없습니다."));
     }
+
+    @Transactional
+    public void updateFcmToken(Long id, String fcmToken) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("해당 ID의 사용자를 찾을 수 없습니다. ID: " + id));
+        user.setFcmToken(fcmToken);
+    }
 }
