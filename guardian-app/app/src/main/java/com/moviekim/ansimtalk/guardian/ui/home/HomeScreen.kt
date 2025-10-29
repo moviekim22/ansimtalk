@@ -30,27 +30,21 @@ val BackgroundGray = Color(0xFFF5F5F5)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
-    Scaffold(
-        topBar = { TopAppBar() },
-        bottomBar = { BottomNavigationBar() },
-        containerColor = BackgroundGray
-    ) { paddingValues ->
-        // Column을 스크롤 가능하게 만듭니다.
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp) // 카드 사이의 간격
-        ) {
-            Spacer(modifier = Modifier.height(8.dp)) // 상단 여백
-            CurrentStatusCard(isSafe = true) // true: 안전, false: 위험
-            QuickContactCard()
-            DailyCheckInCard(isChecked = true)
-            MedicationCard()
-            Spacer(modifier = Modifier.height(8.dp)) // 하단 여백
-        }
+    // Column을 스크롤 가능하게 만듭니다.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundGray)
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp) // 카드 사이의 간격
+    ) {
+        Spacer(modifier = Modifier.height(8.dp)) // 상단 여백
+        CurrentStatusCard(isSafe = true) // true: 안전, false: 위험
+        QuickContactCard()
+        DailyCheckInCard(isChecked = true)
+        MedicationCard()
+        Spacer(modifier = Modifier.height(8.dp)) // 하단 여백
     }
 }
 
@@ -238,30 +232,6 @@ fun InfoCard(
             }
             Spacer(modifier = Modifier.height(12.dp))
             content()
-        }
-    }
-}
-
-// 하단 네비게이션 바
-@Composable
-fun BottomNavigationBar() {
-    var selectedItem by remember { mutableIntStateOf(0) }
-    val items = listOf(
-        "홈" to Icons.Default.Home,
-        "기록" to Icons.Default.List,
-        "설정" to Icons.Default.Settings
-    )
-
-    NavigationBar(
-        containerColor = Color.White
-    ) {
-        items.forEachIndexed { index, item ->
-            NavigationBarItem(
-                icon = { Icon(item.second, contentDescription = item.first) },
-                label = { Text(item.first) },
-                selected = selectedItem == index,
-                onClick = { selectedItem = index }
-            )
         }
     }
 }

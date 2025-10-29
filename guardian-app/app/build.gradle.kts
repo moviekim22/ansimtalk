@@ -73,4 +73,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     // 3. 통신 과정을 로그로 보여주는 도구 (디버깅 필수!)
     implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+
+    // Navigation Compose
+    implementation("androidx.navigation:navigation-compose:2.7.7")
 }
