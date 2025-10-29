@@ -1,7 +1,8 @@
+// 기존 import 문을 모두 지우고 아래 내용으로 완전히 교체하세요.
+
 package com.example.myapplication
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -11,18 +12,15 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.telephony.SmsManager
 import android.util.Log
 import android.widget.Toast
-import android.os.Build
-import android.telephony.SmsManager
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,8 +38,6 @@ import androidx.compose.material.icons.outlined.SentimentNeutral
 import androidx.compose.material.icons.outlined.SentimentVerySatisfied
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,18 +65,15 @@ import com.example.myapplication.network.UserInfo
 import com.example.myapplication.network.UserResponse
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.google.android.gms.location.LocationServices
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.sqrt
 
+// import 문 정리 완료. 이 아래부터는 클래스와 함수들이 위치합니다.
 
 // 보호자 연락처를 관리하는 싱글톤 객체
 object GuardianContactManager {
@@ -142,123 +135,62 @@ fun AnsimTalkApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination?.route
+
     val showBottomBar = currentDestination !in listOf(AppDestinations.LOGIN, AppDestinations.SIGN_UP)
 
-    // --- 상태 변수 및 컨텍스트 ---
+    // --- 낙상 감지 다이얼로그를 위한 상태 ---
     var showFallDialog by remember { mutableStateOf(false) }
-    var showScreamDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // --- 권한 상태를 관리할 변수 추가 ---
-    var allPermissionsGranted by remember { mutableStateOf(false) }
-
-    // --- 권한 요청 런처 (낙상/비명 기능에 필요한 모든 권한을 한 번에 요청) ---
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { permissions ->
-            // 모든 권한이 승인되었는지 확인
-            if (permissions.all { it.value }) {
-                Log.d("PermissionCheck", "모든 필수 권한이 승인되었습니다.")
-                allPermissionsGranted = true
-            } else {
-                Log.d("PermissionCheck", "필수 권한 중 일부가 거부되었습니다.")
-                Toast.makeText(context, "앱의 핵심 기능(낙상/비명 감지)을 위해 권한이 필요합니다.", Toast.LENGTH_LONG).show()
-            }
-        }
-    )
-
-    // --- Composable이 처음 실행될 때 권한 상태를 확인하고, 없으면 요청 ---
-    LaunchedEffect(Unit) {
-        val permissionsToRequest = arrayOf(
-            Manifest.permission.RECORD_AUDIO
-            // 다른 권한이 더 필요하다면 여기에 추가
-        )
-        // 현재 권한 상태를 확인
-        val allGranted = permissionsToRequest.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-        }
-        if (allGranted) {
-            allPermissionsGranted = true
-        } else {
-            // 권한이 없으면 런처를 통해 요청
-            permissionLauncher.launch(permissionsToRequest)
-        }
-    }
-
-    // --- 모든 권한이 허용된 경우에만 감지 기능 활성화 ---
-    if (allPermissionsGranted) {
-        FallDetectionManager {
-            showFallDialog = true
-        }
-        ScreamDetectionManager {
-            showScreamDialog = true
-        }
+    // --- 낙상 감지 기능 관리자 ---
+    FallDetectionManager {
+        // 낙상이 감지되면 다이얼로그를 띄우도록 상태 변경
+        showFallDialog = true
     }
 
     // --- 낙상 감지 다이얼로그 ---
     if (showFallDialog) {
-        var countdown by remember { mutableIntStateOf(30) }
+        var countdown by remember { mutableIntStateOf(15) }
 
+        // 1초마다 카운트다운을 줄이는 효과
         LaunchedEffect(Unit) {
             while (countdown > 0) {
                 delay(1000)
                 countdown--
             }
+            // 카운트다운이 끝나면 (응답이 없으면) 긴급 신고 절차 시작
             showFallDialog = false
             initiateEmergencyCall(context)
         }
 
         AlertDialog(
-            onDismissRequest = { /* 비활성화 */ },
+            onDismissRequest = { /* 바깥 클릭으로 닫기 비활성화 */ },
             title = { Text("낙상 감지!", color = Color.Red, fontWeight = FontWeight.Bold) },
             text = { Text("괜찮으신가요? $countdown 초 후 자동으로 119에 신고됩니다.") },
             confirmButton = {
                 Button(
-                    onClick = { showFallDialog = false },
+                    onClick = {
+                        // "괜찮아요" 버튼을 누르면 다이얼로그만 닫음
+                        showFallDialog = false
+                    },
+                    // 버튼 크기를 키워서 누르기 쉽게 함
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                ) { Text("괜찮아요", fontSize = 18.sp) }
+                ) {
+                    Text("괜찮아요", fontSize = 18.sp)
+                }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showFallDialog = false
-                    initiateEmergencyCall(context)
-                }) { Text("즉시 신고하기", color = Color.Red) }
-            }
-        )
-    }
-
-    // --- 비명 감지 다이얼로그 ---
-    if (showScreamDialog) {
-        var countdown by remember { mutableIntStateOf(30) }
-
-        LaunchedEffect(Unit) {
-            while (countdown > 0) {
-                delay(1000)
-                countdown--
-            }
-            showScreamDialog = false
-            initiateEmergencyCall(context)
-        }
-
-        AlertDialog(
-            onDismissRequest = { /* 비활성화 */ },
-            title = { Text("비명 감지!", color = Color.Red, fontWeight = FontWeight.Bold) },
-            text = { Text("위급 상황이신가요? $countdown 초 후 자동으로 119에 신고됩니다.") },
-            confirmButton = {
-                Button(
-                    onClick = { showScreamDialog = false },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) { Text("괜찮아요", fontSize = 18.sp) }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showScreamDialog = false
-                    initiateEmergencyCall(context)
-                }) { Text("즉시 신고하기", color = Color.Red) }
+                TextButton(
+                    onClick = {
+                        // "신고하기"를 누르면 즉시 긴급 신고 절차 시작
+                        showFallDialog = false
+                        initiateEmergencyCall(context)
+                    }
+                ) {
+                    Text("즉시 신고하기", color = Color.Red)
+                }
             }
         )
     }
@@ -299,93 +231,6 @@ fun AnsimTalkApp() {
         )
     }
 }
-
-@Composable
-fun ScreamDetectionManager(onScreamDetected: () -> Unit) {
-    val context = LocalContext.current
-
-    // 권한 요청 로직은 AnsimTalkApp으로 이동했으므로 여기서는 별도로 처리하지 않음.
-    // 이 Composable은 권한이 이미 확보된 상태에서 호출되는 것을 전제로 함.
-
-    // DisposableEffect를 사용하여 Composable의 생명주기와 마이크 리스너의 생명주기를 동기화
-    DisposableEffect(Unit) {
-        // 백그라운드 작업을 관리할 코루틴 스코프 생성
-        val coroutineScope = CoroutineScope(Dispatchers.IO)
-        var audioRecord: AudioRecord? = null
-
-        // 코루틴을 시작하여 백그라운드에서 마이크 입력을 계속 감시
-        coroutineScope.launch {
-            // 마이크 녹음을 위한 설정값
-            val sampleRate = 8000
-            val channelConfig = AudioFormat.CHANNEL_IN_MONO
-            val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-            val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
-
-            // 권한이 있는지 다시 한번 확인 (안전장치)
-            if (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.RECORD_AUDIO
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                // 권한이 없으면 이 코루틴을 즉시 종료
-                return@launch
-            }
-
-            // AudioRecord 객체 생성 및 녹음 시작
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                sampleRate,
-                channelConfig,
-                audioFormat,
-                bufferSize
-            ).apply {
-                startRecording()
-            }
-
-            val buffer = ShortArray(bufferSize)
-
-            // 코루틴이 활성화되어 있는 동안 무한 루프 실행
-            while (isActive) {
-                val readSize = audioRecord?.read(buffer, 0, buffer.size) ?: 0
-                if (readSize > 0) {
-                    var sum: Long = 0
-                    // 버퍼에 들어온 소리 데이터의 평균 크기를 계산
-                    for (i in 0 until readSize) {
-                        sum += kotlin.math.abs(buffer[i].toLong())
-                    }
-                    val amplitude = sum / readSize
-
-                    // --- 기준치를 500으로 낮춰서 작은 소리에도 반응하는지 테스트 ---
-                    val AMPLITUDE_THRESHOLD = 1000
-
-                    if (amplitude > AMPLITUDE_THRESHOLD) {
-                        Log.d("ScreamDetection", "임계값 초과! 현재 소리 크기: $amplitude")
-                        // UI 변경(다이얼로그 띄우기)은 반드시 Main 스레드에서 호출
-                        withContext(Dispatchers.Main) {
-                            onScreamDetected()
-                        }
-                        // 짧은 시간 내에 중복 알림이 울리는 것을 방지하기 위해 5초 대기
-                        delay(5000)
-                    }
-                }
-            }
-        }
-
-        // onDispose: 이 Composable이 화면에서 사라질 때 실행되는 정리(clean-up) 블록
-        onDispose {
-            Log.d("ScreamDetection", "비명 감지 기능을 정리하고 종료합니다.")
-            // 백그라운드에서 실행되던 코루틴 작업을 취소
-            coroutineScope.cancel()
-            // 사용하던 마이크 리소스를 시스템에 반환
-            audioRecord?.stop()
-            audioRecord?.release()
-        }
-    }
-}
-
-
-
-
 @Composable
 fun FallDetectionManager(onFallDetected: () -> Unit) {
     val context = LocalContext.current
