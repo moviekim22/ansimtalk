@@ -137,67 +137,92 @@ fun AnsimTalkApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination?.route
-
     val showBottomBar = currentDestination !in listOf(AppDestinations.LOGIN, AppDestinations.SIGN_UP)
 
-    // --- 낙상 감지 다이얼로그를 위한 상태 ---
     var showFallDialog by remember { mutableStateOf(false) }
+    var fallTime by remember { mutableLongStateOf(0L) }
     val context = LocalContext.current
 
-    // --- 낙상 감지 기능 관리자 ---
-    FallDetectionManager {
-        // 낙상이 감지되면 다이얼로그를 띄우도록 상태 변경
-        showFallDialog = true
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissions ->
+            if (permissions.all { it.value }) {
+                Log.d("AnsimTalkApp", "모든 권한 승인됨. 감지 서비스를 시작합니다.")
+                val serviceIntent = Intent(context, DetectionService::class.java)
+                ContextCompat.startForegroundService(context, serviceIntent)
+            } else {
+                Toast.makeText(context, "백그라운드 감지를 위해 모든 권한이 필요합니다.", Toast.LENGTH_LONG).show()
+            }
+        }
+    )
+
+    LaunchedEffect(Unit) {
+        val permissionsToRequest = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.SEND_SMS
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val allGranted = permissionsToRequest.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (allGranted) {
+            val serviceIntent = Intent(context, DetectionService::class.java)
+            ContextCompat.startForegroundService(context, serviceIntent)
+        } else {
+            permissionLauncher.launch(permissionsToRequest.toTypedArray())
+        }
     }
 
-    // --- 낙상 감지 다이얼로그 ---
+    // --- ★★★ 이 부분이 오류의 원인! 누락된 코드 추가 ★★★ ---
+    val activity = (LocalContext.current as? MainActivity)
+    val intentAction = activity?.intent?.action
+
+    // 시작 경로 결정: "낙상 감지" 액션이 있으면 HOME, 없으면 LOGIN
+    val startDestination = if (intentAction == "ACTION_SHOW_FALL_DIALOG") {
+        AppDestinations.HOME
+    } else {
+        AppDestinations.LOGIN
+    }
+    // --------------------------------------------------------
+
+    LaunchedEffect(key1 = activity, key2 = activity?.intent) {
+        if (activity?.intent?.getBooleanExtra("FALL_DETECTED", false) == true) {
+            Log.d("AnsimTalkApp", "FALL_DETECTED 인텐트를 수신했습니다.")
+            val detectedTime = activity.intent.getLongExtra("FALL_TIME", 0L)
+            if (detectedTime > 0) {
+                fallTime = detectedTime
+                showFallDialog = true
+            }
+            activity.intent?.removeExtra("FALL_DETECTED")
+            activity.intent?.removeExtra("FALL_TIME")
+        }
+    }
+
     if (showFallDialog) {
-        var countdown by remember { mutableIntStateOf(30) }
+        val elapsedTimeInSeconds = (System.currentTimeMillis() - fallTime) / 1000
+        val initialCountdown = (30 - elapsedTimeInSeconds).toInt().coerceAtLeast(0)
+        var countdown by remember { mutableIntStateOf(initialCountdown) }
 
         LaunchedEffect(Unit) {
             while (countdown > 0) {
                 delay(1000)
                 countdown--
             }
-            // 카운트다운이 끝나면 (응답이 없으면) 긴급 알림 절차 시작
             showFallDialog = false
-            // --- ★★★ 119 대신, 보호자에게 문자를 보내는 함수로 교체! ★★★ ---
             initiateEmergencyCall(context)
         }
-
         AlertDialog(
-            onDismissRequest = { /* 바깥 클릭으로 닫기 비활성화 */ },
+            onDismissRequest = { /* 비활성화 */ },
             title = { Text("낙상 감지!", color = Color.Red, fontWeight = FontWeight.Bold) },
-            // --- ★★★ 안내 문구도 보호자 기준으로 수정! ★★★ ---
             text = { Text("괜찮으신가요? $countdown 초 후 자동으로 보호자에게 문자가 전송됩니다.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        // "괜찮아요" 버튼을 누르면 다이얼로그만 닫음
-                        showFallDialog = false
-                    }
-                ) {
-                    Text("괜찮아요")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        // "즉시 전송"을 누르면 즉시 긴급 알림 절차 시작
-                        showFallDialog = false
-                        // --- ★★★ 여기도 보호자에게 문자를 보내는 함수로 교체! ★★★ ---
-                        initiateEmergencyCall(context)
-                    }
-                ) {
-                    // --- ★★★ 버튼 텍스트도 수정! ★★★ ---
-                    Text("즉시 전송", color = Color.Red)
-                }
-            }
+            confirmButton = { Button(onClick = { showFallDialog = false }) { Text("괜찮아요") } },
+            dismissButton = { TextButton(onClick = { showFallDialog = false; initiateEmergencyCall(context) }) { Text("즉시 전송", color = Color.Red) } }
         )
     }
 
-
-    // --- 약 목록 상태를 최상위로 이동 ---
     val medicationList = remember {
         mutableStateListOf(
             Medication(name = "철분약", time = "08:00", taken = true),
@@ -215,94 +240,20 @@ fun AnsimTalkApp() {
             }
         }
     ) { innerPadding ->
-        // --- AppNavHost에 약 목록과 모든 수정 함수 전달 ---
         AppNavHost(
             navController = navController,
             modifier = Modifier.padding(innerPadding),
+            startDestination = startDestination, // 이제 이 변수가 존재하므로 오류 해결!
             medicationList = medicationList,
             onAddMedication = { name, time -> medicationList.add(Medication(name = name, time = time)) },
             onTakePill = { medication ->
                 val index = medicationList.indexOf(medication)
-                if (index != -1) {
-                    medicationList[index] = medication.copy(taken = true)
-                }
+                if (index != -1) { medicationList[index] = medication.copy(taken = true) }
             },
             onRemoveMedication = { medication ->
                 medicationList.remove(medication)
             }
         )
-    }
-}
-@Composable
-fun FallDetectionManager(onFallDetected: () -> Unit) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    // 센서 관리자와 리스너 상태 저장
-    val sensorManager = remember {
-        context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    }
-    val accelerometer = remember {
-        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-    }
-
-    // 낙상 감지 알고리즘을 위한 상태 변수
-    var freeFallDetected by remember { mutableStateOf(false) }
-    var lastFreeFallTime by remember { mutableLongStateOf(0L) }
-
-    val sensorEventListener = remember {
-        object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent?) {
-                if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
-                    val x = event.values[0]
-                    val y = event.values[1]
-                    val z = event.values[2]
-
-                    // 가속도 벡터의 크기 계산
-                    val magnitude = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
-
-                    // 1. 자유 낙하 감지 (가속도 크기가 매우 작을 때)
-                    if (magnitude < 2.0f) {
-                        freeFallDetected = true
-                        lastFreeFallTime = System.currentTimeMillis()
-                    }
-
-                    // 2. 충격 감지 (가속도 크기가 매우 클 때)
-                    if (magnitude > 15.0f) {
-                        // 자유 낙하가 감지된 후 1초 이내에 강한 충격이 왔는지 확인
-                        if (freeFallDetected && (System.currentTimeMillis() - lastFreeFallTime < 1000)) {
-                            onFallDetected() // 낙상 감지 콜백 호출
-                        }
-                        // 상태 초기화
-                        freeFallDetected = false
-                    }
-                }
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // 사용하지 않음
-            }
-        }
-    }
-
-    // Composable의 생명주기에 맞춰 센서 리스너 등록 및 해제
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                // 앱이 화면에 보일 때 센서 리스너 등록
-                sensorManager.registerListener(sensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL)
-            } else if (event == Lifecycle.Event.ON_PAUSE) {
-                // 앱이 화면에서 사라질 때 리스너 해제 (배터리 절약)
-                sensorManager.unregisterListener(sensorEventListener)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-
-        // Composable이 사라질 때 최종적으로 리스너 해제
-        onDispose {
-            sensorManager.unregisterListener(sensorEventListener)
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
     }
 }
 
@@ -311,6 +262,7 @@ fun FallDetectionManager(onFallDetected: () -> Unit) {
 fun AppNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
+    startDestination: String, // 시작 경로를 파라미터로 받도록 변경
     medicationList: List<Medication>,
     onAddMedication: (String, String) -> Unit,
     onTakePill: (Medication) -> Unit,
@@ -318,31 +270,20 @@ fun AppNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = AppDestinations.LOGIN,
+        startDestination = startDestination, // 전달받은 시작 경로를 사용
         modifier = modifier
     ) {
-        composable(AppDestinations.LOGIN) {
-            LoginScreen(navController)
-        }
-        composable(AppDestinations.SIGN_UP) {
-            SignUpScreen(navController)
-        }
-        composable(AppDestinations.HOME) {
-            HomeScreen(navController, medicationList)
-        }
-        composable(AppDestinations.SAFETY_CHECK) {
-            SafetyCheckScreen(navController)
-        }
+        composable(AppDestinations.LOGIN) { LoginScreen(navController) }
+        composable(AppDestinations.SIGN_UP) { SignUpScreen(navController) }
+        composable(AppDestinations.HOME) { HomeScreen(navController, medicationList) }
+        composable(AppDestinations.SAFETY_CHECK) { SafetyCheckScreen(navController) }
         composable(AppDestinations.MEDICATION) {
             MedicationScreen(navController, medicationList, onAddMedication, onTakePill, onRemoveMedication)
         }
-        // --- 바로 이 부분의 내용을 교체하는 것입니다 ---
-        composable(AppDestinations.SETTINGS) {
-            // 기존 Box 대신 우리가 만든 SettingsScreen을 호출
-            SettingsScreen()
-        }
+        composable(AppDestinations.SETTINGS) { SettingsScreen() }
     }
 }
+
 
 // --- 로그인 화면 ---
 @OptIn(ExperimentalMaterial3Api::class)
