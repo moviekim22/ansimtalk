@@ -38,6 +38,8 @@ import androidx.compose.material.icons.outlined.SentimentNeutral
 import androidx.compose.material.icons.outlined.SentimentVerySatisfied
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -150,50 +152,50 @@ fun AnsimTalkApp() {
 
     // --- 낙상 감지 다이얼로그 ---
     if (showFallDialog) {
-        var countdown by remember { mutableIntStateOf(15) }
+        var countdown by remember { mutableIntStateOf(30) }
 
-        // 1초마다 카운트다운을 줄이는 효과
         LaunchedEffect(Unit) {
             while (countdown > 0) {
                 delay(1000)
                 countdown--
             }
-            // 카운트다운이 끝나면 (응답이 없으면) 긴급 신고 절차 시작
+            // 카운트다운이 끝나면 (응답이 없으면) 긴급 알림 절차 시작
             showFallDialog = false
+            // --- ★★★ 119 대신, 보호자에게 문자를 보내는 함수로 교체! ★★★ ---
             initiateEmergencyCall(context)
         }
 
         AlertDialog(
             onDismissRequest = { /* 바깥 클릭으로 닫기 비활성화 */ },
             title = { Text("낙상 감지!", color = Color.Red, fontWeight = FontWeight.Bold) },
-            text = { Text("괜찮으신가요? $countdown 초 후 자동으로 119에 신고됩니다.") },
+            // --- ★★★ 안내 문구도 보호자 기준으로 수정! ★★★ ---
+            text = { Text("괜찮으신가요? $countdown 초 후 자동으로 보호자에게 문자가 전송됩니다.") },
             confirmButton = {
                 Button(
                     onClick = {
                         // "괜찮아요" 버튼을 누르면 다이얼로그만 닫음
                         showFallDialog = false
-                    },
-                    // 버튼 크기를 키워서 누르기 쉽게 함
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
+                    }
                 ) {
-                    Text("괜찮아요", fontSize = 18.sp)
+                    Text("괜찮아요")
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = {
-                        // "신고하기"를 누르면 즉시 긴급 신고 절차 시작
+                        // "즉시 전송"을 누르면 즉시 긴급 알림 절차 시작
                         showFallDialog = false
+                        // --- ★★★ 여기도 보호자에게 문자를 보내는 함수로 교체! ★★★ ---
                         initiateEmergencyCall(context)
                     }
                 ) {
-                    Text("즉시 신고하기", color = Color.Red)
+                    // --- ★★★ 버튼 텍스트도 수정! ★★★ ---
+                    Text("즉시 전송", color = Color.Red)
                 }
             }
         )
     }
+
 
     // --- 약 목록 상태를 최상위로 이동 ---
     val medicationList = remember {
