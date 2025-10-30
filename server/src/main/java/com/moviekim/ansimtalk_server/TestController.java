@@ -20,7 +20,7 @@ public class TestController {
         // EventService에 있는 긴급 알림 발송 로직을 호출합니다.
         eventService.sendEmergencyAlert(requestDto.getElderlyId());
 
-        return "긴급 PUSH 알림 발송 요청이 완료되었습니다.";
+        return "Urgent PUSH notification request completed";
     }
 
     // 요청 DTO도 userId를 받도록 변경
