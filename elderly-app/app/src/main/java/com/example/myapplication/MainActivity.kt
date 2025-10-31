@@ -7,10 +7,8 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Location
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.telephony.SmsManager
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -20,18 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +48,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.myapplication.dto.EventRequest
+import com.example.myapplication.dto.EventType
 import com.example.myapplication.dto.LoginResponse
 import com.example.myapplication.dto.UserInfo
 import com.example.myapplication.dto.UserResponse
@@ -69,13 +58,10 @@ import com.example.myapplication.network.StatusRequest
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.util.UserManager
 import com.google.android.gms.location.LocationServices
-import kotlinx.coroutines.delay
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
-import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.sqrt
 
 object GuardianContactManager {
     private const val PREFS_NAME = "ansimtalk_prefs"
@@ -137,8 +123,7 @@ fun AnsimTalkApp() {
     LaunchedEffect(Unit) {
         val permissionsToRequest = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.SEND_SMS
+            Manifest.permission.ACCESS_COARSE_LOCATION
         ).apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
@@ -263,10 +248,7 @@ fun EmergencyCallCard() {
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = { permissions ->
-            val isLocationGranted = permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
-                    permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
-
-            if (isLocationGranted) {
+            if (permissions.values.all { it }) { // 모든 권한이 승인되었는지 확인
                 initiateEmergencyCall(context)
             } else {
                 Toast.makeText(context, "위치 권한이 거부되었습니다.", Toast.LENGTH_LONG).show()
@@ -277,23 +259,22 @@ fun EmergencyCallCard() {
     if (showEmergencyDialog) {
         AlertDialog(
             onDismissRequest = { showEmergencyDialog = false },
-            title = { Text("긴급 알림", color = Color.Red, fontWeight = FontWeight.Bold) },
-            text = { Text("현재 위치를 보호자에게 전송하시겠습니까?") },
+            title = { Text("긴급 호출", color = Color.Red, fontWeight = FontWeight.Bold) },
+            text = { Text("정말로 긴급 호출을 하시겠습니까?") },
             confirmButton = {
                 Button(
                     onClick = {
                         showEmergencyDialog = false
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                                Manifest.permission.SEND_SMS
-                            )
+                        val permissionsToRequest = arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
                         )
+                        // 권한 요청
+                        permissionLauncher.launch(permissionsToRequest)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
-                    Text("전송")
+                    Text("호출")
                 }
             },
             dismissButton = {
@@ -304,30 +285,32 @@ fun EmergencyCallCard() {
         )
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
-        shape = RoundedCornerShape(16.dp)
+    Button(
+        onClick = { showEmergencyDialog = true },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp), // Increased height
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFD32F2F), // Red color
+            contentColor = Color.White
+        )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Column {
-                Text("긴급 전화", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("버튼을 누르면 바로 연결돼요")
-            }
-            Button(
-                onClick = { showEmergencyDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                shape = CircleShape,
-                modifier = Modifier.size(64.dp)
-            ) {
-                Icon(Icons.Default.Call, contentDescription = "전화 걸기", tint = Color.White)
-            }
+            Icon(
+                Icons.Default.Warning, // Warning icon
+                contentDescription = "긴급 호출 아이콘",
+                modifier = Modifier.size(32.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "긴급 호출",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -335,35 +318,59 @@ fun EmergencyCallCard() {
 private fun initiateEmergencyCall(context: Context) {
     val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
-    if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-        ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-        Toast.makeText(context, "위치 권한이 없습니다.", Toast.LENGTH_LONG).show()
+    if (ActivityCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+        Toast.makeText(context, "위치 권한이 없어 호출을 할 수 없습니다.", Toast.LENGTH_LONG).show()
         return
     }
 
-    fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-        val locationText = location?.let { "위도: ${it.latitude}, 경도: ${it.longitude}" } ?: "위치 정보를 가져올 수 없습니다."
-        val message = "긴급 상황! 현재 위치: $locationText"
-        val guardianPhone = GuardianContactManager.getGuardianPhone(context)
-
-        if (!guardianPhone.isNullOrEmpty()) {
-            try {
-                val smsManager: SmsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    context.getSystemService(SmsManager::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    SmsManager.getDefault()
-                }
-                smsManager.sendTextMessage(guardianPhone, null, message, null, null)
-                Toast.makeText(context, "보호자에게 긴급 메시지를 전송했습니다.", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "SMS 전송에 실패했습니다.", Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            Toast.makeText(context, "등록된 보호자 연락처가 없습니다.", Toast.LENGTH_SHORT).show()
-        }
+    val userId = UserManager.currentUser?.id
+    if (userId == null) {
+        Toast.makeText(context, "로그인이 필요합니다.", Toast.LENGTH_SHORT).show()
+        return
     }
+
+    fusedLocationClient.lastLocation
+        .addOnSuccessListener { location: Location? ->
+            val latitude = location?.latitude ?: 0.0
+            val longitude = location?.longitude ?: 0.0
+
+            val eventRequest = EventRequest(
+                userId = userId,
+                eventType = EventType.EMERGENCY_CALL,
+                latitude = latitude,
+                longitude = longitude
+            )
+
+            RetrofitInstance.api.sendEmergencyEvent(eventRequest).enqueue(object : Callback<Void> {
+                override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                    if (response.isSuccessful) {
+                        Log.d("EmergencyCall", "긴급 호출 성공")
+                        Toast.makeText(context, "긴급 호출이 성공적으로 전송되었습니다.", Toast.LENGTH_LONG).show()
+                    } else {
+                        Log.e("EmergencyCall", "긴급 호출 실패: ${response.code()}")
+                        Toast.makeText(context, "긴급 호출 전송에 실패했습니다.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onFailure(call: Call<Void>, t: Throwable) {
+                    Log.e("EmergencyCall", "네트워크 오류", t)
+                    Toast.makeText(context, "네트워크 오류로 긴급 호출에 실패했습니다.", Toast.LENGTH_SHORT).show()
+                }
+            })
+        }
+        .addOnFailureListener { e ->
+            Log.e("EmergencyCall", "위치 정보 가져오기 실패", e)
+            Toast.makeText(context, "위치 정보를 가져오는 데 실패했습니다.", Toast.LENGTH_SHORT).show()
+        }
 }
+
 
 @Composable
 fun SafetyCheckCard(navController: NavController) {

@@ -117,7 +117,7 @@ fun SignUpScreen(navController: NavController) {
                         loginId = id,
                         password = password,
                         name = name,
-                        role = "ELDERLY"
+                        role = "ELDERLY" // 역할 변경
                     )
 
                     // Retrofit으로 회원가입 요청

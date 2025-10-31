@@ -1,7 +1,7 @@
 package com.example.myapplication.network
 
+import com.example.myapplication.dto.EventRequest
 import com.example.myapplication.dto.LoginResponse
-import com.example.myapplication.dto.UserInfo
 import com.example.myapplication.dto.UserLoginRequest
 import com.example.myapplication.dto.UserResponse
 import com.example.myapplication.dto.UserSignUpRequest
@@ -23,4 +23,7 @@ interface ApiService {
 
     @GET("api/users/{userId}")
     fun getUserInfo(@Path("userId") userId: Long): Call<UserResponse>
+
+    @POST("api/events/emergency")
+    fun sendEmergencyEvent(@Body eventRequest: EventRequest): Call<Void>
 }
