@@ -2,6 +2,7 @@
 package com.example.myapplication
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -39,6 +41,7 @@ import retrofit2.Response
 fun LoginScreen(navController: NavController, onLoginSuccess: (LoginResponse) -> Unit) {
     var id by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -68,6 +71,14 @@ fun LoginScreen(navController: NavController, onLoginSuccess: (LoginResponse) ->
 
         Button(
             onClick = {
+                // 테스트용 코드: 아이디와 비밀번호가 '1'이면 즉시 로그인
+                if (id == "1" && password == "1") {
+                    val testUser = LoginResponse(id = 1L, loginId = "testuser", name = "테스트 사용자")
+                    onLoginSuccess(testUser)
+                    Toast.makeText(context, "테스트 모드로 로그인했습니다.", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+
                 val loginRequest = UserLoginRequest(id, password)
                 RetrofitInstance.api.login(loginRequest).enqueue(object : Callback<LoginResponse> {
                     override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
@@ -78,11 +89,13 @@ fun LoginScreen(navController: NavController, onLoginSuccess: (LoginResponse) ->
                             }
                         } else {
                             Log.e("LoginScreen", "Login Failed: ${response.errorBody()?.string()}")
+                            Toast.makeText(context, "로그인에 실패했습니다.", Toast.LENGTH_SHORT).show()
                         }
                     }
 
                     override fun onFailure(call: Call<LoginResponse>, t: Throwable) {
                         Log.e("LoginScreen", "Login Error: ", t)
+                        Toast.makeText(context, "네트워크 오류가 발생했습니다.", Toast.LENGTH_SHORT).show()
                     }
                 })
             },
