@@ -22,70 +22,52 @@ class DetectionService : Service(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
-    private var gyroscope: Sensor? = null // 자이로스코프 센서 추가
+    private var gyroscope: Sensor? = null
 
-    // 낙상 감지 알고리즘을 위한 상수 (재조정됨)
     companion object {
-        private const val FREE_FALL_THRESHOLD = 3.0f      // 자유 낙하 문턱값 (m/s^2)
-        private const val SHOCK_THRESHOLD = 15.0f         // 충격 문턱값 (m/s^2)
-        private const val GYRO_SHOCK_THRESHOLD = 10.0f    // 자이로스코프 충격 (회전) 문턱값 (rad/s)
-        private const val IMPACT_TIME_WINDOW_MS = 1200L   // 자유 낙하 후 충격 감지 유효 시간 (ms)
-        private const val FALL_COOLDOWN_MS = 10000L       // 낙상 감지 후 쿨다운 시간 (10초)
+        private const val FREE_FALL_THRESHOLD = 3.0f
+        private const val SHOCK_THRESHOLD = 18.0f
+        private const val GYRO_SHOCK_THRESHOLD = 10.0f
+        private const val IMPACT_TIME_WINDOW_MS = 1200L
+        private const val FALL_COOLDOWN_MS = 10000L
+        private const val FALL_DETECTION_CHANNEL_ID = "FALL_DETECTION_CHANNEL"
     }
 
     private var freeFallStartTime = 0L
     private var isFreeFall = false
     private var lastFallDetectedTime = 0L
-
-    private var lastGyroscopeMagnitude = 0.0f // 최신 자이로스코프 회전 크기 저장
-    private var lastGyroscopeTimestamp = 0L
+    private var lastGyroscopeMagnitude = 0.0f
 
     override fun onSensorChanged(event: SensorEvent?) {
         val now = System.currentTimeMillis()
-
         when (event?.sensor?.type) {
             Sensor.TYPE_ACCELEROMETER -> {
-                // 쿨다운: 마지막 낙상 감지 후 일정 시간 동안은 새로운 감지를 무시
                 if (now - lastFallDetectedTime < FALL_COOLDOWN_MS) {
-                    isFreeFall = false // 쿨다운 중에는 자유 낙하 상태도 초기화
+                    isFreeFall = false
                     return
                 }
-
                 val x = event.values[0]
                 val y = event.values[1]
                 val z = event.values[2]
                 val magnitude = sqrt(x * x + y * y + z * z)
-
-                Log.d("DetectionService", "Accel reading: magnitude = $magnitude, isFreeFall = $isFreeFall")
-
-                // 1. 자유 낙하 시작 감지
+                Log.d("DetectionService", "Accel: $magnitude, Gyro: $lastGyroscopeMagnitude, FreeFall: $isFreeFall")
                 if (!isFreeFall && magnitude < FREE_FALL_THRESHOLD) {
                     isFreeFall = true
                     freeFallStartTime = now
                     Log.d("DetectionService", "자유 낙하 상태 시작!")
                 }
-
-                // 2. 자유 낙하 중일 때 로직
                 if (isFreeFall) {
                     val timeSinceFreeFallStart = now - freeFallStartTime
-
-                    // 2-1. 충격 감지
                     if (magnitude > SHOCK_THRESHOLD) {
-                        if (timeSinceFreeFallStart < IMPACT_TIME_WINDOW_MS) {
-                            // 가속도계 충격과 자이로스코프 회전이 동시에 발생했는지 확인
-                            if (lastGyroscopeMagnitude > GYRO_SHOCK_THRESHOLD && (now - lastGyroscopeTimestamp < IMPACT_TIME_WINDOW_MS)) {
-                                Log.e("DetectionService", "★★★ 낙상 감지! (가속도 충격: ${magnitude}, 자이로 회전: ${lastGyroscopeMagnitude}, 시간: ${timeSinceFreeFallStart}ms) ★★★")
-                                showFullScreenNotification(now)
-                                lastFallDetectedTime = now // 마지막 감지 시간 업데이트 (쿨다운 시작)
-                            } else {
-                                Log.d("DetectionService", "가속도 충격 감지, 하지만 자이로스코프 회전 부족 또는 시간 초과")
-                            }
+                        if (lastGyroscopeMagnitude > GYRO_SHOCK_THRESHOLD) {
+                            Log.e("DetectionService", "★★★ 낙상 감지! FullScreenIntent 실행 ★★★")
+                            triggerFullScreenActivity()
+                            lastFallDetectedTime = now
                         } else {
-                            Log.d("DetectionService", "가속도 충격 감지되었으나 자유 낙하 시간 초과: ${timeSinceFreeFallStart}ms")
+                            Log.d("DetectionService", "가속도 충격 감지, 하지만 자이로스코프 회전 부족")
                         }
-                        isFreeFall = false // 상태 초기화
+                        isFreeFall = false
                     }
-                    // 2-2. 타임아웃: 일정 시간 동안 충격이 없으면 상태 초기화
                     else if (timeSinceFreeFallStart > IMPACT_TIME_WINDOW_MS) {
                         Log.d("DetectionService", "자유 낙하 타임아웃, 상태 초기화")
                         isFreeFall = false
@@ -97,35 +79,30 @@ class DetectionService : Service(), SensorEventListener {
                 val y = event.values[1]
                 val z = event.values[2]
                 lastGyroscopeMagnitude = sqrt(x * x + y * y + z * z)
-                lastGyroscopeTimestamp = now
-                Log.d("DetectionService", "Gyro reading: magnitude = ${lastGyroscopeMagnitude}")
             }
         }
     }
 
-    private fun showFullScreenNotification(fallDetectionTime: Long) {
+    // FullScreenIntent를 사용하여 MainActivity를 즉시 실행하는 함수
+    private fun triggerFullScreenActivity() {
         val fullScreenIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_SHOW_FALL_DIALOG"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("FALL_DETECTED", true)
-            // --- ★★★ 낙상 발생 시간을 Long 타입으로 전달 ★★★ ---
-            putExtra("FALL_TIME", fallDetectionTime)
         }
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
-            this,
-            System.currentTimeMillis().toInt(),
-            fullScreenIntent,
+            this, System.currentTimeMillis().toInt(), fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notificationBuilder = NotificationCompat.Builder(this, "FALL_DETECTION_CHANNEL")
+        val notificationBuilder = NotificationCompat.Builder(this, FALL_DETECTION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("긴급 상황: 낙상 감지!")
             .setContentText("앱을 열어 현재 상태를 확인해주세요.")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setFullScreenIntent(fullScreenPendingIntent, true) // FullScreen Intent 설정
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createHighPriorityNotificationChannel(notificationManager)
@@ -138,15 +115,14 @@ class DetectionService : Service(), SensorEventListener {
         super.onCreate()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) // 자이로스코프 초기화
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(1, createServiceNotification())
-        // 두 센서 모두 감지 속도를 높여 더 정밀한 데이터 수집
         accelerometer?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
-        gyroscope?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) } // 자이로스코프 리스너 등록
-        Log.d("DetectionService", "낙상 감지 서비스가 시작되었습니다. (가속도, 자이로스코프 감지 속도: GAME)")
+        gyroscope?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+        Log.d("DetectionService", "낙상 감지 서비스가 시작되었습니다.")
         return START_STICKY
     }
 
@@ -159,20 +135,22 @@ class DetectionService : Service(), SensorEventListener {
     private fun createHighPriorityNotificationChannel(notificationManager: NotificationManager) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                "FALL_DETECTION_CHANNEL",
-                "낙상 감지 알림",
+                FALL_DETECTION_CHANNEL_ID,
+                "낙상 감지 긴급 알림",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "낙상 감지 시 화면을 즉시 켜고 알림을 표시합니다."
+                // 이 채널은 화면을 직접 띄우는 용도이므로, 소리나 진동은 생략
             }
             notificationManager.createNotificationChannel(channel)
         }
     }
 
+    // 서비스가 강제 종료되지 않도록 하기 위한 최소한의 알림
     private fun createServiceNotification(): Notification {
         val channelId = "AnsimTalkServiceChannel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "안심톡 감지 서비스", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(channelId, "안심톡 감지 서비스", NotificationManager.IMPORTANCE_MIN)
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
         }
         val pendingIntent: PendingIntent = Intent(this, MainActivity::class.java).let {
