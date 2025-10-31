@@ -1,4 +1,4 @@
-package com.example.myapplication.network
+package com.example.myapplication.dto
 
 data class UserInfo(
     val userId: Long,

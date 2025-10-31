@@ -1,6 +1,7 @@
 
 package com.example.myapplication
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -26,10 +27,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.myapplication.dto.LoginResponse
+import com.example.myapplication.dto.UserLoginRequest
+import com.example.myapplication.network.RetrofitInstance
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(navController: NavController) {
+fun LoginScreen(navController: NavController, onLoginSuccess: (LoginResponse) -> Unit) {
     var id by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
@@ -61,9 +68,23 @@ fun LoginScreen(navController: NavController) {
 
         Button(
             onClick = {
-                navController.navigate(AppDestinations.HOME) {
-                    popUpTo(AppDestinations.LOGIN) { inclusive = true }
-                }
+                val loginRequest = UserLoginRequest(id, password)
+                RetrofitInstance.api.login(loginRequest).enqueue(object : Callback<LoginResponse> {
+                    override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
+                        if (response.isSuccessful) {
+                            response.body()?.let {
+                                Log.d("LoginScreen", "Login Success: $it")
+                                onLoginSuccess(it)
+                            }
+                        } else {
+                            Log.e("LoginScreen", "Login Failed: ${response.errorBody()?.string()}")
+                        }
+                    }
+
+                    override fun onFailure(call: Call<LoginResponse>, t: Throwable) {
+                        Log.e("LoginScreen", "Login Error: ", t)
+                    }
+                })
             },
             modifier = Modifier
                 .fillMaxWidth()
