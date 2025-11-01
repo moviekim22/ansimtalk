@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
                             SignUpScreen(navController)
                         }
                         composable("home") {
-                            HomeScreen()
+                            HomeScreen(navController)
                         }
                         composable("history") {
                             // TODO: 기록 화면 구현
