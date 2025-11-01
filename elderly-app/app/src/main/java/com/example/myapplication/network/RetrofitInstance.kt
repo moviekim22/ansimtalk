@@ -6,8 +6,6 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitInstance {
-    // TODO: 서버 실행 후 자신의 컴퓨터 IP 주소로 변경해야 합니다.
-    // cmd -> ipconfig 로 확인한 본인 컴퓨터의 IPv4 주소를 넣으세요.
     private const val BASE_URL = "http://192.168.1.16:8080/" // <- ★★★ 이 부분을 본인 IP로! ★★★
 
     // 통신 로그를 확인하기 위한 설정

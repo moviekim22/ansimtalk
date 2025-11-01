@@ -47,7 +47,7 @@ class DetectionService : Service(), SensorEventListener {
 
         // --- 미사용 감지 상수 추가 ---
         private const val ACTIVITY_CHECK_INTERVAL_MS = 10*1000L//임시로 10초마다 체크로 수정//30 * 60 * 1000L // 30분
-        private const val INACTIVITY_THRESHOLD_MS = 1*60*1000L//임시로 1분으로 수정//4 * 60 * 60 * 1000L // 4시간
+        private const val INACTIVITY_THRESHOLD_MS = 0.5*60*1000L//임시로 30초로 수정//4 * 60 * 60 * 1000L // 4시간
         private const val INACTIVITY_NOTIFICATION_ID = 3
         private const val INACTIVITY_CHANNEL_ID = "INACTIVITY_CHANNEL"
     }

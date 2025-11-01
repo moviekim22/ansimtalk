@@ -79,7 +79,7 @@ fun LoginScreen(navController: NavController, onLoginSuccess: (LoginResponse) ->
                     return@Button
                 }
 
-                val loginRequest = UserLoginRequest(id, password)
+                val loginRequest = UserLoginRequest(id, password, "ELDERLY")
                 RetrofitInstance.api.login(loginRequest).enqueue(object : Callback<LoginResponse> {
                     override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
                         if (response.isSuccessful) {
