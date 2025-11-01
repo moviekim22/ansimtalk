@@ -117,15 +117,12 @@ fun AnsimTalkApp(intent: Intent) {
     val currentDestination = navBackStackEntry?.destination?.route
     val context = LocalContext.current
 
-    // 1. 낙상 감지 신호 확인
     val isFallDetected = intent.getBooleanExtra("FALL_DETECTED", false)
+    val isInactivityDetected = intent.getBooleanExtra("INACTIVITY_DETECTED", false)
 
-    // 2. 로그인 상태 확인 및 시작 화면 결정
     val isLoggedIn = UserSessionManager.loadSession()
-    // 낙상이 감지되었거나, 이미 로그인 상태라면 홈으로, 아니면 로그인 화면으로 시작
-    val startDestination = if (isFallDetected || isLoggedIn) AppDestinations.HOME else AppDestinations.LOGIN
+    val startDestination = if (isFallDetected || isInactivityDetected || isLoggedIn) AppDestinations.HOME else AppDestinations.LOGIN
 
-    // 3. 권한 요청 로직 (기존과 동일)
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = { permissions ->
@@ -174,6 +171,7 @@ fun AnsimTalkApp(intent: Intent) {
             modifier = Modifier.padding(innerPadding),
             startDestination = startDestination,
             isFallDetected = isFallDetected, // 낙상 감지 상태 전달
+            isInactivityDetected = isInactivityDetected,
             medicationList = medicationList,
             onAddMedication = { name, time -> medicationList.add(Medication(name = name, time = time)) },
             onTakePill = { medication ->
@@ -193,6 +191,7 @@ fun AppNavHost(
     modifier: Modifier = Modifier,
     startDestination: String,
     isFallDetected: Boolean, // 낙상 감지 상태 수신
+    isInactivityDetected: Boolean,
     medicationList: List<Medication>,
     onAddMedication: (String, String) -> Unit,
     onTakePill: (Medication) -> Unit,
@@ -200,12 +199,8 @@ fun AppNavHost(
 ) {
     val context = LocalContext.current
 
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
-        modifier = modifier
-    ) {
-        composable(AppDestinations.LOGIN) {
+    NavHost(navController = navController, startDestination = startDestination, modifier = modifier) {
+    composable(AppDestinations.LOGIN) {
             LoginScreen(navController = navController, onLoginSuccess = { user ->
                 UserSessionManager.login(context, user)
                 navController.navigate(AppDestinations.HOME) { popUpTo(AppDestinations.LOGIN) { inclusive = true } }
@@ -219,7 +214,8 @@ fun AppNavHost(
                 navController = navController,
                 userName = userName,
                 medicationList = medicationList,
-                isFallDetected = isFallDetected // 낙상 감지 상태를 홈 화면에 전달
+                isFallDetected = isFallDetected, // 낙상 감지 상태를 홈 화면에 전달
+                isInactivityDetected = isInactivityDetected
             )
         }
         composable(AppDestinations.MEDICATION) {
@@ -234,15 +230,20 @@ fun HomeScreen(
     navController: NavController,
     userName: String,
     medicationList: List<Medication>,
-    isFallDetected: Boolean // 낙상 감지 상태 수신
+    isFallDetected: Boolean, // 낙상 감지 상태 수신
+    isInactivityDetected: Boolean
+
 ) {
     var showFallDialog by remember { mutableStateOf(isFallDetected) }
+    var showInactivityDialog by remember { mutableStateOf(isInactivityDetected) }
 
     // 낙상 감지 다이얼로그 표시
     if (showFallDialog) {
         FallDetectionDialog(onDismiss = { showFallDialog = false })
     }
-
+    if (showInactivityDialog) {
+        InactivityDialog(onDismiss = { showInactivityDialog = false })
+    }
     val totalPills = medicationList.size
     val takenPills = medicationList.count { it.taken }
 
@@ -303,6 +304,42 @@ fun FallDetectionDialog(onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("즉시 전송하기", color = Color.Gray)
+            }
+        }
+    )
+}
+// --- 장시간 미사용 다이얼로그 추가 ---
+@Composable
+fun InactivityDialog(onDismiss: () -> Unit) {
+    var countdown by remember { mutableStateOf(60) } // 60초 카운트다운
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        while (countdown > 0) {
+            delay(1000)
+            countdown--
+        }
+        if (countdown == 0) {
+            Toast.makeText(context, "보호자에게 응답이 없음을 알립니다.", Toast.LENGTH_LONG).show()
+            // TODO: 미응답 이벤트 서버 전송 로직 추가
+            onDismiss()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = {},
+        title = {
+            Text("괜찮으세요?", fontWeight = FontWeight.Bold, fontSize = 24.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        },
+        text = {
+            Text("장시간 활동이 감지되지 않았습니다. ${countdown}초 후 보호자에게 알림이 전송됩니다.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            ) {
+                Text("네, 괜찮아요", fontSize = 18.sp)
             }
         }
     )
