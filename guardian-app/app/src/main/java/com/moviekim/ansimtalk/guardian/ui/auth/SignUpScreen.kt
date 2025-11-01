@@ -26,6 +26,7 @@ import retrofit2.Response
 fun SignUpScreen(navController: NavController) {
     var loginId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordConfirm by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     val context = LocalContext.current
 
@@ -56,6 +57,15 @@ fun SignUpScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
+            value = passwordConfirm,
+            onValueChange = { passwordConfirm = it },
+            label = { Text("비밀번호 확인") },
+            modifier = Modifier.fillMaxWidth(),
+            isError = password.isNotEmpty() && passwordConfirm.isNotEmpty() && password != passwordConfirm
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
             value = name,
             onValueChange = { name = it },
             label = { Text("이름") },
@@ -65,6 +75,11 @@ fun SignUpScreen(navController: NavController) {
 
         Button(
             onClick = {
+                if (password != passwordConfirm) {
+                    Toast.makeText(context, "비밀번호가 일치하지 않습니다.", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+
                 val signUpRequest = UserSignUpRequest(loginId, password, name, "GUARDIAN")
                 RetrofitClient.apiService.signUp(signUpRequest).enqueue(object : Callback<Void> {
                     override fun onResponse(call: Call<Void>, response: Response<Void>) {

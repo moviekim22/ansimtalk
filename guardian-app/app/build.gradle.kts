@@ -91,4 +91,7 @@ dependencies {
 
     // Location Services for Geocoding
     implementation("com.google.android.gms:play-services-location:21.2.0")
+
+    // EncryptedSharedPreferences for storing login info
+    implementation("androidx.security:security-crypto:1.1.0")
 }

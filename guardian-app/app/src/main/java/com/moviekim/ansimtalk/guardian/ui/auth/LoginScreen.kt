@@ -31,6 +31,7 @@ import retrofit2.Response
 fun LoginScreen(navController: NavController) {
     var loginId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var rememberMe by remember { mutableStateOf(true) }
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
 
@@ -58,7 +59,16 @@ fun LoginScreen(navController: NavController) {
             label = { Text("비밀번호") },
             modifier = Modifier.fillMaxWidth()
         )
-        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
+            Text("자동 로그인")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = {
@@ -67,10 +77,11 @@ fun LoginScreen(navController: NavController) {
                     override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
                         if (response.isSuccessful) {
                             response.body()?.let { user ->
-                                // 1. 로그인 성공 정보 저장
-                                sessionManager.saveUser(user)
+                                if (rememberMe) {
+                                    sessionManager.saveUser(user)
+                                }
 
-                                // 2. FCM 토큰 가져와서 서버로 전송
+                                // FCM 토큰 가져와서 서버로 전송
                                 FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                                     if (!task.isSuccessful) {
                                         Log.w("FCM", "FCM 토큰 가져오기 실패", task.exception)
@@ -93,7 +104,6 @@ fun LoginScreen(navController: NavController) {
                                     })
                                 }
 
-                                // 3. 화면 전환
                                 Toast.makeText(context, "${user.name}님 환영합니다!", Toast.LENGTH_SHORT).show()
                                 navController.navigate("home") {
                                     popUpTo("login") { inclusive = true }
