@@ -150,7 +150,7 @@ class DetectionService : Service(), SensorEventListener {
         startForeground(1, createServiceNotification())
         accelerometer?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
         gyroscope?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
-        
+
         // --- 주기적 활동 체크 시작 추가 ---
         handler.removeCallbacks(activityCheckRunnable) // 혹시 모를 중복 실행 방지
         handler.post(activityCheckRunnable)
@@ -184,7 +184,7 @@ class DetectionService : Service(), SensorEventListener {
         val currentTime = System.currentTimeMillis()
         val inactiveDuration = currentTime - lastUserPresentTime
 
-    // 로그를 초 단위로 변경하여 확인 용이하게 함
+        // 로그를 초 단위로 변경하여 확인 용이하게 함
         Log.d("DetectionService", "활동 체크: 마지막 활동 후 ${inactiveDuration / 1000}초 경과")
 
         if (inactiveDuration > INACTIVITY_THRESHOLD_MS) {
