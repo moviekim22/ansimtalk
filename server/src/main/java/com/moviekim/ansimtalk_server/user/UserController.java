@@ -34,7 +34,9 @@ public class UserController {
     // 로그인 API
     @PostMapping("/login")
     public ResponseEntity<UserLoginResponseDto> login(@RequestBody UserLoginRequestDto requestDto) {
-        User user = userService.login(requestDto.getLoginId(), requestDto.getPassword());
+        // 아이디, 비밀번호를 따로 보내는 대신,
+        // 'role'이 포함된 DTO 객체 자체를 서비스로 전달합니다.
+        User user = userService.login(requestDto); // <-- 이 부분이 변경되었습니다!
 
         // User 엔티티를 응답용 DTO로 변환
         UserLoginResponseDto responseDto = new UserLoginResponseDto(user);
@@ -43,6 +45,7 @@ public class UserController {
         return ResponseEntity.ok(responseDto);
     }
 
+    // FCM 토큰 업데이트 API (수정 없음)
     @PutMapping("/fcm-token")
     public ResponseEntity<String> updateFcmToken(@RequestBody FcmTokenRequestDto requestDto) {
         // DTO에서 userId와 fcmToken을 꺼내서 서비스에 전달합니다.
