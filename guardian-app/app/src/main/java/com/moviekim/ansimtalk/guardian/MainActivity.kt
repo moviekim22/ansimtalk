@@ -21,12 +21,16 @@ import com.moviekim.ansimtalk.guardian.ui.auth.SignUpScreen
 import com.moviekim.ansimtalk.guardian.ui.home.HomeScreen
 import com.moviekim.ansimtalk.guardian.ui.settings.SettingsScreen
 import com.moviekim.ansimtalk.guardian.ui.theme.GuardianappTheme
+import com.moviekim.ansimtalk.guardian.ui.util.SessionManager
 
 class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val sessionManager = SessionManager(this)
+        val startDestination = if (sessionManager.isLoggedIn()) "home" else "login"
 
         enableEdgeToEdge()
         setContent {
@@ -43,7 +47,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) {
-                    NavHost(navController = navController, startDestination = "login") {
+                    NavHost(navController = navController, startDestination = startDestination) {
                         composable("login") {
                             LoginScreen(navController)
                         }
@@ -57,7 +61,7 @@ class MainActivity : ComponentActivity() {
                             // TODO: 기록 화면 구현
                         }
                         composable("settings") {
-                            SettingsScreen()
+                            SettingsScreen(navController)
                         }
                     }
                 }

@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,6 +27,7 @@ import retrofit2.Response
 fun SignUpScreen(navController: NavController) {
     var loginId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordConfirm by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     val context = LocalContext.current
 
@@ -51,7 +53,18 @@ fun SignUpScreen(navController: NavController) {
             value = password,
             onValueChange = { password = it },
             label = { Text("비밀번호") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation()
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = passwordConfirm,
+            onValueChange = { passwordConfirm = it },
+            label = { Text("비밀번호 확인") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation(),
+            isError = password.isNotEmpty() && passwordConfirm.isNotEmpty() && password != passwordConfirm
         )
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -65,6 +78,11 @@ fun SignUpScreen(navController: NavController) {
 
         Button(
             onClick = {
+                if (password != passwordConfirm) {
+                    Toast.makeText(context, "비밀번호가 일치하지 않습니다.", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+
                 val signUpRequest = UserSignUpRequest(loginId, password, name, "GUARDIAN")
                 RetrofitClient.apiService.signUp(signUpRequest).enqueue(object : Callback<Void> {
                     override fun onResponse(call: Call<Void>, response: Response<Void>) {
@@ -85,6 +103,11 @@ fun SignUpScreen(navController: NavController) {
             shape = RoundedCornerShape(8.dp)
         ) {
             Text("회원가입", modifier = Modifier.padding(vertical = 8.dp))
+        }
+
+        // 로그인 화면으로 돌아가는 버튼
+        TextButton(onClick = { navController.popBackStack() }) {
+            Text("로그인 화면으로 돌아가기")
         }
     }
 }

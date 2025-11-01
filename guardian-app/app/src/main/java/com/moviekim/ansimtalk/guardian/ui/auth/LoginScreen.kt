@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,6 +32,7 @@ import retrofit2.Response
 fun LoginScreen(navController: NavController) {
     var loginId by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var rememberMe by remember { mutableStateOf(true) }
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
 
@@ -56,21 +58,32 @@ fun LoginScreen(navController: NavController) {
             value = password,
             onValueChange = { password = it },
             label = { Text("비밀번호") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation()
         )
-        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it })
+            Text("자동 로그인")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = {
-                val loginRequest = UserLoginRequest(loginId, password)
+                val loginRequest = UserLoginRequest(loginId, password, "GUARDIAN")
                 RetrofitClient.apiService.login(loginRequest).enqueue(object : Callback<LoginResponse> {
                     override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
                         if (response.isSuccessful) {
                             response.body()?.let { user ->
-                                // 1. 로그인 성공 정보 저장
-                                sessionManager.saveUser(user)
+                                if (rememberMe) {
+                                    sessionManager.saveUser(user)
+                                }
 
-                                // 2. FCM 토큰 가져와서 서버로 전송
+                                // FCM 토큰 가져와서 서버로 전송
                                 FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                                     if (!task.isSuccessful) {
                                         Log.w("FCM", "FCM 토큰 가져오기 실패", task.exception)
@@ -93,7 +106,6 @@ fun LoginScreen(navController: NavController) {
                                     })
                                 }
 
-                                // 3. 화면 전환
                                 Toast.makeText(context, "${user.name}님 환영합니다!", Toast.LENGTH_SHORT).show()
                                 navController.navigate("home") {
                                     popUpTo("login") { inclusive = true }
