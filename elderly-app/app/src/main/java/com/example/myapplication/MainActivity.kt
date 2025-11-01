@@ -465,7 +465,18 @@ private fun initiateEmergencyCall(context: Context) {
 @Composable
 fun MedicationCard(navController: NavController, takenCount: Int, totalCount: Int) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { navController.navigate(AppDestinations.MEDICATION) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                navController.navigate(AppDestinations.MEDICATION) {
+                    // 하단 네비게이션과 동일한 로직으로 수정
+                    popUpTo(navController.graph.startDestinationId) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
@@ -687,31 +698,25 @@ fun AppBottomNavigation(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val items = mapOf(
-        AppDestinations.HOME to "홈",
-        AppDestinations.MEDICATION to "약 관리",
-        AppDestinations.SETTINGS to "설정"
-    )
-    val icons = mapOf(
-        AppDestinations.HOME to Icons.Default.Home,
-        AppDestinations.MEDICATION to Icons.Default.Info,
-        AppDestinations.SETTINGS to Icons.Default.Settings
-    )
-
     NavigationBar {
-        items.forEach { (screen, label) ->
-            NavigationBarItem(
-                icon = { Icon(icons[screen]!!, contentDescription = label) },
-                label = { Text(label) },
-                selected = currentRoute == screen,
-                onClick = {
-                    navController.navigate(screen) {
-                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            )
-        }
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Home, contentDescription = "홈") },
+            label = { Text("홈") },
+            selected = currentRoute == AppDestinations.HOME,
+            onClick = { navController.navigate(AppDestinations.HOME) { launchSingleTop = true; popUpTo(navController.graph.startDestinationId) { saveState = true } } }
+        )
+
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Info, contentDescription = "약 관리") },
+            label = { Text("약 관리") },
+            selected = currentRoute == AppDestinations.MEDICATION,
+            onClick = { navController.navigate(AppDestinations.MEDICATION) { launchSingleTop = true; popUpTo(navController.graph.startDestinationId) { saveState = true } } }
+        )
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Settings, contentDescription = "설정") },
+            label = { Text("설정") },
+            selected = currentRoute == AppDestinations.SETTINGS,
+            onClick = { navController.navigate(AppDestinations.SETTINGS) { launchSingleTop = true; popUpTo(navController.graph.startDestinationId) { saveState = true } } }
+        )
     }
 }
